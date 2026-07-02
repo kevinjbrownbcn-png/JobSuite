@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Job Hunter — JobSuite</title>
+    <link rel="stylesheet" href="css/styles.css">
+
+<script>
+        window.switchTab = function(tabId) {
+            ['hunt', 'manual', 'history', 'make'].forEach(function(t) {
+                var navBtn = document.getElementById('tab-' + t);
+                var contentBlock = document.getElementById('content-' + t);
+
+                if (t === tabId) {
+                    if (navBtn) navBtn.className = "active";
+                    if (contentBlock) contentBlock.className = "tab-content-active space-y-6";
+                } else {
+                    if (navBtn) navBtn.className = "";
+                    if (contentBlock) contentBlock.className = "tab-content-hidden space-y-6";
+                }
+            });
+
+            if (tabId === 'history' && typeof window.renderHistoryLogTable === 'function') {
+                window.renderHistoryLogTable();
+            }
+        };
+
+        window.analyzeManualText = async function() {
+            try {
+                const mod = await import('./js/hunter-manual.js');
+                return await mod.analyzeManualText();
+            } catch(e) {
+                console.error("Manual Text Routing Core Error:", e);
+                if (window.showAlert) window.showAlert("Execution Failed", e.message, "error");
+            }
+        };
+
+        window.analyzeManualURL = async function() {
+            try {
+                const mod = await import('./js/hunter-manual.js');
+                return await mod.analyzeManualURL();
+            } catch(e) {
+                console.error("Manual URL Routing Core Error:", e);
+                if (window.showAlert) window.showAlert("Execution Failed", e.message, "error");
+            }
+        };
+    </script>
+
+    <script type="module">
+        import { loadParamState } from './js/hunter-config.js';
+        import { renderJobCards, updateSelectedCounter, addCustomRoleOption, toggleSelectAll, clearHistoryLog, renderHistoryLogTable } from './js/hunter-ui.js';
+        import { scanWebForJobs } from './js/hunter-scanner.js';
+        import { exportJobsToTracker } from './js/hunter-exporter.js';
+        import { analyzeCareersHub } from './js/hunter-hub.js';
+
+        window.renderJobCards = renderJobCards;
+        window.updateSelectedCounter = updateSelectedCounter;
+        window.renderHistoryLogTable = renderHistoryLogTable;
+        window.analyzeCareersHub = analyzeCareersHub;
+        window.addCustomRoleOption = addCustomRoleOption;
+        window.toggleSelectAll = toggleSelectAll;
+        window.clearHistoryLog = clearHistoryLog;
+        window.scanWebForJobs = scanWebForJobs;
+        window.exportJobsToTracker = exportJobsToTracker;
+
+        window.onload = async function() {
+            document.getElementById('footer-year').textContent = new Date().getFullYear();
+            if (typeof loadParamState === 'function') {
+                try { await loadParamState(); } catch(e) { console.warn("Param state warm boot deferred:", e); }
+            }
+
+            window.exportSelectedJobs = async function() {
+                let selectedJobsArray = [];
+
+                if (window.selectedJobs && window.selectedJobs.length > 0) {
+                    selectedJobsArray = window.selectedJobs;
+                } else {
+                    const checkedBoxes = document.querySelectorAll('.job-card-checkbox:checked');
+
+                    checkedBoxes.forEach(cb => {
+                        if (cb.id === 'master-select-checkbox' || cb.classList.contains('select-all-box')) return;
+
+                        const jobIdxStr = cb.getAttribute('data-index');
+                        if (jobIdxStr !== null && window.currentJobsList) {
+                            const targetIndex = parseInt(jobIdxStr, 10);
+                            const jobPayload = window.currentJobsList[targetIndex];
+                            if (jobPayload) {
+                                selectedJobsArray.push(jobPayload);
+                            }
+                        }
+                    });
+                }
+
+                if (selectedJobsArray.length === 0) {
+                    window.showAlert('Selection Missing', 'No active cards marked for export extraction lines.', 'warning');
+                    return;
+                }
+
+                return window.exportJobsToTracker(selectedJobsArray);
+            };
+        };
+    </script>
+</head>
+<body>
+
+    <header>
+        <div class="header-branding">
+            <div class="header-icon">💼</div>
+            <div class="header-text">
+                <h1>AI Job Hunter</h1>
+                <p>JobSuite — Standalone App Integration Pipeline [v4.0]</p>
+            </div>
+        </div>
+
+        <nav>
+            <button onclick="window.switchTab('hunt')" id="tab-hunt" class="active">🔎 Web Job Scanner</button>
+            <button onclick="window.switchTab('manual')" id="tab-manual">🎯 Manual Audit</button>
+            <button onclick="window.switchTab('history')" id="tab-history">⏳ Export History</button>
+            <button onclick="window.switchTab('make')" id="tab-make">🔗 Connection Settings</button>
+        </nav>
+    </header>
+
+    <main>
+        <div id="content-hunt" class="tab-content-active space-y-6">
+            <div class="card-panel" style="width: 100%; box-sizing: border-box;">
+                <div>
+                    <h2 class="panel-title">🎛️ Configure Automated Market Scan</h2>
+
+                    <div class="form-grid">
+                        <div>
+                            <label class="input-label">Target Roles</label>
+                            <div class="list-container">
+                                <div id="roles-checkbox-list" class="scroll-list">
+                                    <!-- populated from hunter-profiles.json by hunter-config.js -->
+                                </div>
+                                <div class="add-role-row">
+                                    <input type="text" id="custom-role-input" placeholder="Add custom title..." onkeydown="if(event.key === 'Enter') window.addCustomRoleOption()" class="text-input" style="padding: 4px 8px; font-size: 11px;">
+                                    <button onclick="window.addCustomRoleOption()" class="text-input" style="width: auto; background-color: #1e293b; padding: 4px 10px; font-weight: bold; cursor: pointer;">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div class="input-group">
+                                <label for="search-location" class="input-label">Location Criteria</label>
+                                <input type="text" id="search-location" value="" class="text-input">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="input-group">
+                                    <label for="search-time" class="input-label">Search Window</label>
+                                    <select id="search-time" class="text-input" style="height: 34px; padding: 4px 8px; cursor: pointer;">
+                                        <option value="the last 24 hours">24 Hours</option>
+                                        <option value="the last 3 days">3 Days</option>
+                                        <option value="the last 7 days" selected>7 Days</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="search-focus" class="input-label">Niche Keywords</label>
+                                    <input type="text" id="search-focus" value="" class="text-input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="window.scanWebForJobs()" class="btn-primary" style="margin-top: 12px;">🚀 Scan Live Web for Roles</button>
+            </div>
+
+            <div id="loading-state" class="hidden state-msg-box" style="padding: 32px;">
+                <div class="loader-spinner"></div>
+                <div>
+                    <h3 id="loader-title">Contacting Google Drive...</h3>
+                    <p id="loader-desc">Downloading your live resume template contents via Make.com webhook bridge.</p>
+                </div>
+            </div>
+
+            <div id="bulk-controls-panel" class="hidden bulk-bar">
+                <div class="bulk-left">
+                    <input type="checkbox" id="master-select-checkbox" onclick="window.toggleSelectAll(this)">
+                    <label for="master-select-checkbox">Select All Roles</label>
+                </div>
+                <div class="bulk-right">
+                    <span id="selected-counter-text" class="counter-label">0 of 0 selected</span>
+                    <button id="bulk-export-btn" onclick="window.exportSelectedJobs()" class="btn-export">
+                        <span>📦</span> <span id="export-button-text">Export All to Tracking Sheet</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="results-container" class="results-section hidden">
+                <div class="results-header">
+                    <h3 class="results-title"><span></span> Discovered Openings</h3>
+                    <span id="results-count" class="results-badge">0 Roles Found</span>
+                </div>
+                <div id="jobs-list" style="display: flex; flex-direction: column; gap: 16px;"></div>
+            </div>
+
+            <div id="empty-state" class="state-msg-box">
+                <div class="state-icon">💤</div>
+                <h3>Ready to Hunt</h3>
+                <p>Your configuration inputs save automatically. Run a web discovery query or jump to Manual Audit to evaluate specific positions.</p>
+            </div>
+        </div>
+
+        <div id="content-manual" class="tab-content-hidden space-y-6">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: start;">
+
+                <div class="card-panel panel-verbatim" style="height: 100%;">
+                    <div>
+                        <h2 class="panel-title">📋 Analyze Verbatim Description</h2>
+                        <p class="panel-desc">Paste raw text blocks to compute skill gaps and match statistics instantly.</p>
+
+                        <div class="input-group" style="margin-top: 14px;">
+                            <label for="manual-text-title" class="input-label">Position Title (Optional)</label>
+                            <input type="text" id="manual-text-title" placeholder="Auto-extract if blank" class="text-input">
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="manual-text-company" class="input-label">Company / Studio (Optional)</label>
+                            <input type="text" id="manual-text-company" placeholder="Auto-extract if blank" class="text-input">
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="manual-text-url" class="input-label">Job Posting URL (Optional)</label>
+                            <input type="text" id="manual-text-url" placeholder="https://... (saved to tracker)" class="text-input">
+                        </div>
+                        <div class="input-group" style="margin-top: 8px; margin-bottom: 8px;">
+                            <label for="manual-profile" class="input-label">Alignment Context</label>
+                            <select id="manual-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                                <!-- populated from hunter-profiles.json -->
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="manual-description" class="input-label">Job Description Text</label>
+                            <textarea id="manual-description" placeholder="Paste full qualifications details here..." class="text-input" style="height: 100px; resize: none; font-family: inherit;"></textarea>
+                        </div>
+                    </div>
+                    <button onclick="window.analyzeManualText()" class="btn-primary" style="margin-top: auto;">⚡ Run Skillset Audit</button>
+                </div>
+
+                <div class="card-panel panel-url" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h2 class="panel-title">🔗 Analyze Direct URL</h2>
+                        <p class="panel-desc">Paste a specific listing link to pull live webpage data and analyze criteria.</p>
+
+                        <div class="input-group" style="margin-top: 14px;">
+                            <label for="direct-analysis-profile" class="input-label">Alignment Context</label>
+                            <select id="direct-analysis-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                                <!-- populated from hunter-profiles.json -->
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-top: 14px;">
+                            <label for="direct-analysis-url" class="input-label">Job Posting Link</label>
+                            <input type="text" id="direct-analysis-url" placeholder="https://linkedin.com/jobs/view/..." class="text-input">
+                        </div>
+                    </div>
+                    <button onclick="window.analyzeManualURL()" class="btn-primary btn-amber" style="margin-top: auto;">📥 Analyze URL Posting</button>
+                </div>
+
+                <div class="card-panel panel-hub" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h2 class="panel-title" style="color: #c084fc;">🏢 Scan Corporate Careers Hub</h2>
+                        <p class="panel-desc">Paste a corporate career board to automatically crawl, analyze, and grade all vacancies.</p>
+
+                        <div class="input-group" style="margin-top: 14px;">
+                            <label for="hub-analysis-profile" class="input-label">Alignment Context</label>
+                            <select id="hub-analysis-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                                <!-- populated from hunter-profiles.json -->
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-top: 14px;">
+                            <label for="hub-analysis-url" class="input-label">Careers Portal Main Index URL</label>
+                            <input type="text" id="hub-analysis-url" placeholder="https://translated.applytojob.com/apply/" class="text-input">
+                        </div>
+                    </div>
+                    <button onclick="window.analyzeCareersHub()" class="btn-primary" style="background-color: #a855f7; margin-top: auto;">🔮 Batch Process Hub</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="content-history" class="tab-content-hidden space-y-6">
+            <div class="card-panel" style="justify-content: flex-start; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 14px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Spreadsheet Export Ledger</h2>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Global cross-path audit log tracking roles pushed out of the dashboard app.</p>
+                    </div>
+                    <button onclick="window.clearHistoryLog()" class="btn-clear-history">Clear Audit History</button>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Timestamp</th>
+                                <th style="width: 25%;">Job Title</th>
+                                <th style="width: 20%;">Company</th>
+                                <th style="width: 15%;">Location</th>
+                                <th style="width: 12%; text-align: center;">Compatibility</th>
+                                <th style="width: 13%; text-align: right;">Source Link</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-log-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="history-empty-state" class="hidden history-empty-text">No exported entries recorded inside local storage log arrays yet.</div>
+            </div>
+        </div>
+
+        <div id="content-make" class="tab-content-hidden space-y-6">
+            <div class="card-panel" style="justify-content: flex-start; gap: 20px;">
+                <div>
+                    <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Make.com Sync Configuration</h2>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Establish secure webhook links to automatically handle background sync loops.</p>
+                </div>
+
+                <div class="space-y-4" style="width: 100%;">
+                    <div class="input-group">
+                        <label for="gdrive_webhook" class="input-label">GDrive Fetch Webhook URL</label>
+                        <input type="text" id="gdrive_webhook" placeholder="https://hook.us1.make.com/xxxxxxxxxxxx" class="text-input">
+                    </div>
+                    <div class="input-group">
+                        <label for="export_webhook" class="input-label">Spreadsheet Writer Webhook URL</label>
+                        <input type="text" id="export_webhook" placeholder="https://hook.us1.make.com/xxxxxxxxxxxx" class="text-input">
+                    </div>
+                    <button id="save-sync-routes-btn" class="btn-primary" style="width: auto; padding: 10px 24px; margin-top: 8px;">Save Sync Route</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast-wrapper-container" class="toast-wrapper"></div>
+
+	<footer class="app-footer">
+        <span>© <span id="footer-year"></span> JobSuite | AI Job Hunter v4.0</span>
+        <a href="./launcher.html">← Control Center</a>
+        <a href="#">System Integrity Log</a>
+	</footer>
+</body>
+</html>

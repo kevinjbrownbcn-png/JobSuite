@@ -1,0 +1,8 @@
+{
+    "Localization Engineering": ["engineer", "l10n", "regex", "technical", "automation", "developer", "ai"],
+    "Program/Senior Manager":   ["pgm", "lead", "producer", "account manager", "program management", "senior"],
+    "Project Management":       ["pm", "project manager", "coordinator", "producer", "project management"],
+    "Language & QA":            ["linguist", "reviewer", "translator", "qa", "quality", "editor", "loc specialist"],
+    "Data":                     ["analyst", "scientist", "data", "analytics"],
+    "Other Roles":              ["consultant", "operations", "general"]
+}

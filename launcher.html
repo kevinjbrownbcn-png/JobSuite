@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobSuite — Control Center</title>
+    <style>
+        :root {
+            --bg:          #0d1117;
+            --card-bg:     #161b22;
+            --border:      #30363d;
+            --text-main:   #c9d1d9;
+            --text-sub:    #8b949e;
+            --accent:      #2ea44f;
+            --accent-hover:#238636;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 48px;
+            padding: 40px 20px;
+        }
+
+        header { text-align: center; }
+
+        header h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: var(--text-sub);
+            font-size: 1.05rem;
+        }
+
+        .grid {
+            display: flex;
+            gap: 28px;
+            max-width: 860px;
+            width: 100%;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            flex: 1;
+            padding: 36px 28px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 28px rgba(46, 164, 79, 0.18);
+        }
+
+        .card-icon {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .card p {
+            color: var(--text-sub);
+            font-size: 0.95rem;
+            line-height: 1.55;
+            flex-grow: 1;
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: #ffffff;
+            padding: 11px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+
+        .card:hover .btn { background-color: var(--accent-hover); }
+
+        footer.app-footer {
+            background-color: #0f172a;
+            border-top: 1px solid #1e293b;
+            padding: 12px 24px;
+            text-align: right;
+            font-size: 12px;
+            color: #64748b;
+            width: 100%;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+        }
+        footer.app-footer a {
+            color: #2dd4bf;
+            text-decoration: none;
+            font-weight: 600;
+            margin-left: 12px;
+            transition: color 0.2s;
+        }
+        footer.app-footer a:hover { color: #14b8a6; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>JobSuite</h1>
+        <p>Automated Job Search &amp; Tracking Control Center</p>
+    </header>
+
+    <div class="grid">
+
+        <a href="./hunter.html" class="card">
+            <img src="./hunter_icon.ico" alt="AI Job Hunter icon" class="card-icon">
+            <h2>AI Job Hunter</h2>
+            <p>Execute live web scrapes, run AI-powered match evaluations against your CV, and queue fresh leads into the staging tracker.</p>
+            <span class="btn">Launch Hunter</span>
+        </a>
+
+        <a href="./dashboard.html" class="card">
+            <img src="./dashboard_icon.ico" alt="Pipeline Analytics icon" class="card-icon">
+            <h2>Pipeline Analytics</h2>
+            <p>Review application metrics, manage statuses, filter and sort your full pipeline, and monitor response rates over time.</p>
+            <span class="btn">Open Dashboard</span>
+        </a>
+
+    </div>
+
+    <script>document.addEventListener('DOMContentLoaded', () => { document.getElementById('footer-year').textContent = new Date().getFullYear(); });</script>
+    <footer class="app-footer">
+        <span>© <span id="footer-year"></span> JobSuite v1.0</span>
+        <a href="./hunter.html">AI Job Hunter</a>
+        <a href="./dashboard.html">Pipeline Analytics</a>
+    </footer>
+
+</body>
+</html>

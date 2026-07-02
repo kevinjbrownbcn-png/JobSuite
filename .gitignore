@@ -1,0 +1,8 @@
+*.spec
+config.json
+/build
+/dist
+/logs
+__pycache__/
+_debug_hook.py
+export_history.json

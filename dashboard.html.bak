@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Pipeline Analytics — JobSuite</title>
+		<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<style>
+			body { background-color: #0d1117; color: #c9d1d9; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+			.card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+			.accent-glow { border-top: 3px solid #10b981; }
+			.tab-active { color: #10b981; border-bottom: 2px solid #10b981; font-weight: 600; }
+			.custom-scroll::-webkit-scrollbar { width: 4px; }
+			.custom-scroll::-webkit-scrollbar-track { background: #161b22; }
+			.custom-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+			th.sortable { cursor: pointer; user-select: none; }
+			th.sortable:hover { color: #10b981; }
+			.app-footer { background-color: #0f172a; border-top: 1px solid #1e293b; padding: 12px 24px; text-align: right; font-size: 12px; color: #64748b; flex-shrink: 0; }
+			.app-footer a { color: #2dd4bf; text-decoration: none; font-weight: 600; margin-left: 12px; transition: color 0.2s; }
+			.app-footer a:hover { color: #14b8a6; }
+		</style>
+	</head>
+	<body class="p-6 min-h-screen">
+
+		<div class="max-w-7xl mx-auto">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 border-b border-[#30363d] pb-4 gap-4">
+				<div>
+					<h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+						<span class="text-emerald-500">⎋</span> Pipeline Analytics
+					</h1>
+					<div class="flex gap-6 mt-4 text-sm text-gray-400">
+						<button id="tab-btn-metrics" onclick="switchTab('metrics')" class="pb-2 cursor-pointer transition-colors tab-active">Dashboard Metrics</button>
+						<button id="tab-btn-data" onclick="switchTab('data')" class="pb-2 cursor-pointer transition-colors hover:text-white">Applications Viewer</button>
+					</div>
+				</div>
+				<button onclick="fetchDashboardData()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2 px-4 rounded transition-all cursor-pointer shadow-md">
+					Refresh Data
+				</button>
+			</div>
+
+			<div id="loading" class="text-center py-12">
+				<p class="text-emerald-400 animate-pulse text-lg">Connecting to secure web app feed...</p>
+			</div>
+
+			<div id="tab-metrics" class="space-y-6 hidden">
+				<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+					<div class="card p-4 accent-glow">
+						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Applications</p>
+						<p id="kpi-total" class="text-3xl font-bold text-white mt-1">0</p>
+					</div>
+					<div class="card p-4 border-t-3 border-blue-500">
+						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Interviews</p>
+						<p id="kpi-interviews" class="text-3xl font-bold text-blue-400 mt-1">0</p>
+					</div>
+					<div class="card p-4 border-t-3 border-purple-500">
+						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Interview Rate</p>
+						<p id="kpi-conversion" class="text-3xl font-bold text-purple-400 mt-1">0%</p>
+					</div>
+					<div class="card p-4 border-t-3 border-amber-500">
+						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Stale Trackings (&gt;14d)</p>
+						<p id="kpi-stale" class="text-3xl font-bold text-amber-400 mt-1">0</p>
+					</div>
+					<div class="card p-4 border-t-3 border-teal-500">
+						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top Category</p>
+						<p id="kpi-top-category" class="text-xl font-bold text-teal-400 mt-2 truncate">—</p>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+					<div class="card p-4">
+						<h2 class="text-xs font-semibold text-white mb-3 uppercase tracking-wider">Application Funnel</h2>
+						<div class="h-60 flex justify-center items-center"><canvas id="statusChart"></canvas></div>
+					</div>
+					<div class="card p-4">
+						<h2 class="text-xs font-semibold text-white mb-3 uppercase tracking-wider">Top Channels</h2>
+						<div class="h-60 flex justify-center items-center"><canvas id="channelChart"></canvas></div>
+					</div>
+					<div class="card p-4">
+						<h2 class="text-xs font-semibold text-white mb-3 uppercase tracking-wider">Role Types</h2>
+						<div class="h-60 flex justify-center items-center"><canvas id="roleChart"></canvas></div>
+					</div>
+					<div class="card p-4 flex flex-col">
+						<h2 class="text-xs font-semibold text-white mb-2 uppercase tracking-wider">Posting Sources List</h2>
+						<div class="flex-1 overflow-y-auto custom-scroll max-h-60 pr-1">
+							<table class="w-full text-left text-xs text-gray-300">
+								<thead>
+									<tr class="border-b border-[#30363d] text-gray-400 font-medium pb-2 uppercase tracking-tight">
+										<th class="pb-2">Source Origin</th>
+										<th class="pb-2 text-right w-16">Count</th>
+									</tr>
+								</thead>
+								<tbody id="source-table-body"></tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="tab-data" class="hidden space-y-4">
+			<div class="max-w-7xl mx-auto px-6 space-y-4">
+				<div class="card p-4 space-y-3">
+					<div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+						<div>
+							<label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Text Search</label>
+							<input type="text" id="table-search" oninput="filterAndRenderDataView()" placeholder="Company, title, notes..." class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+						</div>
+						<div>
+							<label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Filter Category</label>
+							<select id="filter-category" onchange="filterAndRenderDataView()" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+								<option value="ALL">All Categories</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Filter Status</label>
+							<select id="filter-status" onchange="filterAndRenderDataView()" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+								<option value="ALL">All Statuses</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Filter Source</label>
+							<select id="filter-source" onchange="filterAndRenderDataView()" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+								<option value="ALL">All Posting Sources</option>
+							</select>
+						</div>
+					</div>
+					<div class="text-right text-[11px] text-gray-400 font-mono">
+						Showing <span id="view-records-count" class="text-emerald-400 font-bold">0</span> records
+					</div>
+				</div>
+
+				<div class="card p-5">
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm text-gray-300">
+							<thead>
+								<tr class="border-b border-[#30363d] text-gray-400 font-medium text-xs uppercase tracking-wider select-none">
+									<th class="pb-3 w-28 sortable" onclick="handleSort('Date Applied')">Applied <span id="sort-icon-date">↕</span></th>
+									<th class="pb-3 w-32 sortable" onclick="handleSort('Last Status Update')">Updated <span id="sort-icon-age">↕</span></th>
+									<th class="pb-3 sortable" onclick="handleSort('Job Title')">Role / Company <span id="sort-icon-role">↕</span></th>
+									<th class="pb-3 sortable" onclick="handleSort('Category')">Category <span id="sort-icon-category">↕</span></th>
+									<th class="pb-3 sortable" onclick="handleSort('Status')">Status <span id="sort-icon-status">↕</span></th>
+									<th class="pb-3 sortable" onclick="handleSort('Posting source')">Source / Channel <span id="sort-icon-source">↕</span></th>
+									<th class="pb-3">Notes</th>
+								</tr>
+							</thead>
+							<tbody id="master-table-body"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="js/dashboard-config.js?v=2026"></script>
+		<script src="js/dashboard-roles.js?v=2026"></script>
+		<script src="js/dashboard-api.js?v=2026"></script>
+		<script src="js/dashboard-metrics.js?v=2026"></script>
+		<script src="js/dashboard-viewer.js?v=2026"></script>
+
+		<script>
+			function switchTab(tabId) {
+				if (tabId === 'metrics') {
+					document.getElementById('tab-metrics').classList.remove('hidden');
+					document.getElementById('tab-data').classList.add('hidden');
+					document.getElementById('tab-btn-metrics').className = "pb-2 cursor-pointer transition-colors tab-active";
+					document.getElementById('tab-btn-data').className = "pb-2 cursor-pointer transition-colors text-gray-400 hover:text-white";
+				} else {
+					document.getElementById('tab-metrics').classList.add('hidden');
+					document.getElementById('tab-data').classList.remove('hidden');
+					document.getElementById('tab-btn-metrics').className = "pb-2 cursor-pointer transition-colors text-gray-400 hover:text-white";
+					document.getElementById('tab-btn-data').className = "pb-2 cursor-pointer transition-colors tab-active";
+				}
+			}
+
+			async function processAndRenderAll() {
+				await window.roleDictionaryReady;
+
+				const total = AppState.rawLengthData.length;
+				const statusCounts = {};
+				const channelCounts = {};
+				const sourceCounts = {};
+				const categoryCounts = {};
+
+				const roleCounts = {};
+				Object.keys(ROLE_MAPPING_DICTIONARY).forEach(type => roleCounts[type] = 0);
+				roleCounts["Uncategorized / Other"] = 0;
+
+				let interviewCount = 0;
+				let staleCount = 0;
+
+				AppState.processedData = AppState.rawLengthData.map(row => {
+					const age = calculateDaysSince(row["Date Applied"]);
+					return { ...row, _calculatedAge: age === null ? -1 : age };
+				});
+
+				AppState.processedData.forEach(row => {
+					const status = (row["Status"] || "Applied").trim();
+					const channel = (row["Applied Through"] || "Direct/Other").trim();
+					const source = (row["Posting source"] || "Direct/Other").trim();
+					const category = (row["Category"] || "General").trim();
+					const jobTitle = (row["Job Title"] || "").toLowerCase();
+					const lowerStatus = status.toLowerCase();
+
+					statusCounts[status] = (statusCounts[status] || 0) + 1;
+					channelCounts[channel] = (channelCounts[channel] || 0) + 1;
+					sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+					categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+
+					const feedbackCell = row[CONFIG.FEEDBACK_DAYS_COLUMN];
+					if (feedbackCell !== undefined && feedbackCell !== null) {
+						const cleanStr = String(feedbackCell).trim();
+						if (cleanStr.includes('Pending response')) {
+							const digitMatch = cleanStr.match(/\d+/);
+							if (digitMatch) {
+								const pendingDays = parseInt(digitMatch[0], 10);
+								if (pendingDays > CONFIG.STALE_DAYS_THRESHOLD) staleCount++;
+							}
+						}
+					}
+
+					let matched = false;
+					for (const [roleType, keywords] of Object.entries(ROLE_MAPPING_DICTIONARY)) {
+						if (keywords.some(keyword => jobTitle.includes(keyword.toLowerCase()))) {
+							roleCounts[roleType]++;
+							matched = true;
+							break;
+						}
+					}
+					if (!matched) roleCounts["Uncategorized / Other"]++;
+
+					if (CONFIG.INTERVIEW_KEYWORDS.some(keyword => lowerStatus.includes(keyword))) interviewCount++;
+				});
+
+				let topCategory = "—";
+				let maxCount = 0;
+				Object.keys(categoryCounts).forEach(cat => {
+					if (categoryCounts[cat] > maxCount) { maxCount = categoryCounts[cat]; topCategory = cat; }
+				});
+
+				document.getElementById('kpi-total').innerText = total;
+				document.getElementById('kpi-interviews').innerText = interviewCount;
+				document.getElementById('kpi-stale').innerText = staleCount;
+				document.getElementById('kpi-top-category').innerText = topCategory;
+				document.getElementById('kpi-conversion').innerText = (total > 0 ? Math.round((interviewCount / total) * 100) : 0) + '%';
+
+				populateDropdownFilters(categoryCounts, statusCounts, sourceCounts);
+				renderCharts(statusCounts, channelCounts, roleCounts);
+				renderSourceTable(sourceCounts);
+				filterAndRenderDataView();
+			}
+
+			window.addEventListener('DOMContentLoaded', () => {
+				document.getElementById('footer-year').textContent = new Date().getFullYear();
+				fetchDashboardData();
+			});
+		</script>
+
+		<footer class="app-footer">
+			<span>© <span id="footer-year"></span> JobSuite | Pipeline Analytics</span>
+			<a href="./launcher.html">← Control Center</a>
+			<a href="#">System Integrity Log</a>
+		</footer>
+	</body>
+</html>
