@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jobsuite-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["C:\\Users\\Kevin\\AppData\\Local\\Temp\\claude\\C--Users-Kevin-Desktop-portfolio-JobSuite\\33d62f6a-d9dd-4d4f-9294-20be58a9d499\\scratchpad\\dev_server.py"],
+      "port": 8765
+    },
+    {
+      "name": "jobsuite-streamlit",
+      "runtimeExecutable": "streamlit",
+      "runtimeArgs": ["run", "streamlit_app.py", "--server.headless", "true", "--server.port", "8502"],
+      "port": 8502
+    }
+  ]
+}

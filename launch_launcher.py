@@ -22,8 +22,17 @@ import json
 import os
 import sys
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, urljoin, urldefrag
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+
+import jobsuite_api
+import jobsuite_db
+from jobsuite_config import data_dir, exe_dir, load_config
+
+# Served from data_dir() instead of the static bundle — these are user-editable config
+# (e.g. Posting Source additions), not fixed app code, so a frozen exe must read/write
+# the same live copy every run rather than a temp extraction that resets on each launch.
+DATA_JSON_FILES = ("hunter-profiles.json", "roles-config.json")
 
 
 # ---------------------------------------------------------------------------
@@ -41,35 +50,6 @@ except ImportError:
         "    pip install pywebview[qt]    # Qt5/Qt6\n"
     )
     sys.exit(1)
-
-
-# ---------------------------------------------------------------------------
-# Config loader
-# ---------------------------------------------------------------------------
-
-CONFIG_KEYS = ("gemini_api_key", "gdrive_webhook", "export_webhook")
-
-
-def exe_dir() -> str:
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
-
-
-def load_config() -> dict:
-    config_path = os.path.join(exe_dir(), "config.json")
-    if not os.path.isfile(config_path):
-        print(f"[INFO] No config.json found at {config_path} — using page defaults.")
-        return {}
-    try:
-        with open(config_path, "r", encoding="utf-8") as fh:
-            raw = json.load(fh)
-    except json.JSONDecodeError as exc:
-        print(f"[WARN] config.json is not valid JSON ({exc}) — using page defaults.")
-        return {}
-    config = {k: raw[k] for k in CONFIG_KEYS if k in raw and str(raw[k]).strip()}
-    print(f"[INFO] Config loaded. Keys found: {', '.join(config.keys()) or '(none)'}")
-    return config
 
 
 # ---------------------------------------------------------------------------
@@ -161,141 +141,6 @@ class LoggerAPI:
             print(f"[URL-CHECK] {label} — {url}: {e}")
             return json.dumps({"status": 0, "error": label})
 
-    def batch_scan_careers_hub(self, hub_url: str, profile_context: str) -> str:
-        try:
-            import requests
-            from bs4 import BeautifulSoup
-        except ImportError as e:
-            return json.dumps({"status": "error", "message": f"Missing dependency: {e}. Run: pip install requests beautifulsoup4"})
-
-        api_key = self._config.get("gemini_api_key", "")
-        if not api_key:
-            return json.dumps({"status": "error", "message": "No Gemini API key found in config.json."})
-
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-        headers    = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
-        print(f"[HUB] Crawling hub index: {hub_url}")
-        try:
-            hub_resp = requests.get(hub_url, headers=headers, timeout=15)
-            hub_resp.raise_for_status()
-        except Exception as e:
-            return json.dumps({"status": "error", "message": f"Could not fetch hub page: {e}"})
-
-        soup     = BeautifulSoup(hub_resp.text, "html.parser")
-        base_url = hub_url
-
-        job_links = set()
-        keywords  = ("/apply/", "/job/", "/jobs/", "/careers/", "/position/", "/opening/", "/vacancy/")
-
-        for a in soup.find_all("a", href=True):
-            href     = a["href"].strip()
-            absolute = urljoin(base_url, href)
-            absolute, _ = urldefrag(absolute)
-            if any(kw in absolute.lower() for kw in keywords):
-                if absolute != hub_url:
-                    job_links.add(absolute)
-
-        print(f"[HUB] Found {len(job_links)} candidate job link(s)")
-
-        if not job_links:
-            return json.dumps({"status": "error", "message": "No individual job posting links found on the hub page. The site structure may use JavaScript rendering which requires a different approach."})
-
-        jobs = []
-        for link in list(job_links)[:20]:
-            print(f"[HUB] Analysing: {link}")
-            try:
-                job_resp = requests.get(link, headers=headers, timeout=15)
-                job_resp.raise_for_status()
-                job_soup = BeautifulSoup(job_resp.text, "html.parser")
-                for tag in job_soup(["script", "style", "nav", "footer", "header"]):
-                    tag.decompose()
-                job_text = job_soup.get_text(separator="\n", strip=True)[:6000]
-            except Exception as e:
-                print(f"[HUB] Skipping {link} — fetch failed: {e}")
-                continue
-
-            prompt = f"""You are a job match analyser. Evaluate this job posting for a candidate with a {profile_context} background.
-
-Job posting URL: {link}
-Job posting content:
-{job_text}
-
-Respond ONLY with a valid JSON object (no markdown, no code fences) in exactly this structure:
-{{
-  "job_title": "...",
-  "company": "...",
-  "location": "...",
-  "match_score": <integer 0-100>,
-  "summary": "...",
-  "skills_gaps": ["...", "..."],
-  "link": "{link}"
-}}"""
-
-            try:
-                gemini_resp = requests.post(
-                    gemini_url,
-                    headers={"Content-Type": "application/json"},
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
-                    timeout=30
-                )
-                gemini_resp.raise_for_status()
-                raw_text = gemini_resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                raw_text = raw_text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-                job_data = json.loads(raw_text)
-                jobs.append(job_data)
-                print(f"[HUB] Match score {job_data.get('match_score', '?')} — {job_data.get('job_title', '?')}")
-            except Exception as e:
-                print(f"[HUB] Gemini analysis failed for {link}: {e}")
-                continue
-
-        if not jobs:
-            return json.dumps({"status": "error", "message": "Could not analyse any job postings from the hub. Check the terminal for details."})
-
-        print(f"[HUB] Scan complete — {len(jobs)} job(s) analysed.")
-        return json.dumps({"status": "success", "jobs": jobs})
-
-
-# ---------------------------------------------------------------------------
-# Config script builder — injects API key / webhook values into HTML pages
-# ---------------------------------------------------------------------------
-
-def build_config_script(config: dict) -> str:
-    if not config:
-        return ""
-
-    lines = ["(function () {"]
-
-    for cfg_key, ls_key in [("gdrive_webhook", "gdrive_webhook"),
-                             ("export_webhook",  "export_webhook")]:
-        if cfg_key in config:
-            lines.append(
-                f"  localStorage.setItem({json.dumps(ls_key)}, {json.dumps(config[cfg_key])});"
-            )
-
-    if "gemini_api_key" in config:
-        key  = json.dumps(config["gemini_api_key"])
-        base = json.dumps("https://generativelanguage.googleapis.com")
-        lines += [
-            f"  var _k = {key}, _b = {base}, _f = window.fetch.bind(window);",
-            "  window.fetch = function (url, opts) {",
-            "    if (typeof url === 'string' && url.indexOf(_b) === 0) {",
-            "      url = url.indexOf('key=') !== -1",
-            "        ? url.replace(/([?&]key=)[^&]*/, '$1' + _k)",
-            "        : url + (url.indexOf('?') === -1 ? '?' : '&') + 'key=' + _k;",
-            "    }",
-            "    return _f(url, opts);",
-            "  };",
-        ]
-
-    lines += [
-        "  console.log('[config] JobSuite config script executed.');",
-        "  console.log('[config] fetch wrapper installed:', window.fetch.toString().indexOf('_k') !== -1);",
-    ]
-    lines.append("}());")
-    return "\n".join(lines)
-
-
 # ---------------------------------------------------------------------------
 # Local HTTP server — serves the entire JobSuite directory
 # ---------------------------------------------------------------------------
@@ -314,26 +159,36 @@ MIME_TYPES = {
 
 
 class SuiteHandler(BaseHTTPRequestHandler):
-    """Serves all files in the JobSuite root.
-    Config script is injected into every HTML page served."""
+    """Serves all files in the JobSuite root."""
 
     root_dir  = ""
-    config_js = ""
+    config    = {}
 
     def log_message(self, fmt, *args):
         print(f"[SERVER] {self.address_string()} - {fmt % args}")
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+
+        if parsed.path.startswith("/api/"):
+            self._handle_api("GET")
+            return
+
+        path = parsed.path
 
         # Default to launcher.html for root requests
         if path in ("/", ""):
             path = "/launcher.html"
 
-        file_path = os.path.normpath(os.path.join(self.root_dir, path.lstrip("/")))
+        if path.lstrip("/") in DATA_JSON_FILES:
+            base_dir = data_dir()
+        else:
+            base_dir = self.root_dir
 
-        # Safety: prevent directory traversal outside root
-        if not file_path.startswith(self.root_dir):
+        file_path = os.path.normpath(os.path.join(base_dir, path.lstrip("/")))
+
+        # Safety: prevent directory traversal outside the intended root
+        if not file_path.startswith(base_dir):
             self.send_error(403)
             return
 
@@ -345,18 +200,8 @@ class SuiteHandler(BaseHTTPRequestHandler):
         ext  = os.path.splitext(file_path)[1].lower()
         mime = MIME_TYPES.get(ext, "application/octet-stream")
 
-        if ext == ".html" and self.config_js:
-            with open(file_path, "r", encoding="utf-8") as fh:
-                html = fh.read()
-            tag = f"<script>\n{self.config_js}\n</script>"
-            idx = html.lower().find("<body")
-            if idx != -1:
-                close = html.find(">", idx) + 1
-                html  = html[:close] + "\n" + tag + "\n" + html[close:]
-            body = html.encode("utf-8")
-        else:
-            with open(file_path, "rb") as fh:
-                body = fh.read()
+        with open(file_path, "rb") as fh:
+            body = fh.read()
 
         self.send_response(200)
         self.send_header("Content-Type",   mime)
@@ -364,12 +209,55 @@ class SuiteHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_POST(self):
+        self._dispatch_api_only("POST")
 
-def start_server(root_dir: str, config_js: str) -> str:
-    SuiteHandler.root_dir  = root_dir
-    SuiteHandler.config_js = config_js
+    def do_PATCH(self):
+        self._dispatch_api_only("PATCH")
 
-    server = HTTPServer(("127.0.0.1", 0), SuiteHandler)
+    def do_DELETE(self):
+        self._dispatch_api_only("DELETE")
+
+    def _dispatch_api_only(self, method):
+        if not urlparse(self.path).path.startswith("/api/"):
+            self.send_error(404)
+            return
+        self._handle_api(method)
+
+    def _handle_api(self, method):
+        parsed = urlparse(self.path)
+        query  = parse_qs(parsed.query)
+
+        payload = None
+        length  = int(self.headers.get("Content-Length", 0) or 0)
+        if length:
+            raw = self.rfile.read(length)
+            try:
+                payload = json.loads(raw) if raw else None
+            except json.JSONDecodeError:
+                payload = None
+
+        try:
+            status, response_body = jobsuite_api.dispatch(method, parsed.path, query, payload, self.config)
+        except Exception as e:
+            print(f"[API] Unhandled error on {method} {parsed.path}: {e}")
+            status, response_body = 500, {"error": str(e)}
+
+        body = json.dumps(response_body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def start_server(root_dir: str, config: dict) -> str:
+    SuiteHandler.root_dir = root_dir
+    SuiteHandler.config   = config
+
+    jobsuite_db.init_db()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), SuiteHandler)
     port   = server.server_address[1]
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -426,8 +314,7 @@ def main() -> None:
     config   = load_config()
     root_dir = resolve_root_dir()
 
-    config_js = build_config_script(config)
-    url       = start_server(root_dir, config_js)
+    url = start_server(root_dir, config)
 
     print(f"[INFO] Window: {args.width}x{args.height}")
 

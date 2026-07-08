@@ -3,10 +3,16 @@
  * Handles batch crawling and evaluation of corporate career boards.
  */
 
+import { getPostingSourceValue } from './hunter-config.js';
+
 export async function analyzeCareersHub() {
     const hubUrl = document.getElementById('hub-analysis-url').value.trim();
     const profile = document.getElementById('hub-analysis-profile').value;
-    
+    const extraFields = {
+        applied_through: document.getElementById('hub-analysis-applied-through')?.value.trim() || undefined,
+        posting_source: getPostingSourceValue('hub-analysis-posting-source') || undefined
+    };
+
     if (!hubUrl) {
         window.showAlert('Input Missing', 'Please provide a valid corporate careers portal URL link.', 'warning');
         return;
@@ -26,47 +32,17 @@ export async function analyzeCareersHub() {
     if (loaderTitle) loaderTitle.textContent = "Crawling Careers Hub...";
     if (loaderDesc) loaderDesc.textContent = "Harvesting individual vacancy links and dispatching data structures to the AI match matrix.";
 
-    // 3. Direct Environment Detection
-    const hasPyBridge = window.pywebview && window.pywebview.api;
-
     try {
-        if (hasPyBridge) {
-            if (typeof window.pywebview.api.batch_scan_careers_hub !== 'function') {
-                throw new Error("The backend API method 'batch_scan_careers_hub' is missing or improperly exposed in Python.");
-            }
-
-            const rawResponse = await window.pywebview.api.batch_scan_careers_hub(hubUrl, profile);
-            
-            let data;
-            if (typeof rawResponse === 'string') {
-                data = JSON.parse(rawResponse);
-            } else {
-                data = rawResponse;
-            }
-            
-            if (data && data.status === "success" && Array.isArray(data.jobs)) {
-                processDiscoveredJobs(data.jobs);
-            } else {
-                window.showAlert('Scan Failed', (data && data.message) || 'An unknown structural error occurred.', 'error');
-            }
-        } 
-        else {
-            console.warn("⚠️ PyWebView environment not found. Executing simulated UI loop parsing path.");
-            await new Promise(resolve => setTimeout(resolve, 1200));
-
-            const mockJobs = [
-                {
-                    job_title: "Localization Engineer (v4.0 Sandbox View)",
-                    company: "Translated Studio Mock",
-                    location: "Spain (Remote)",
-                    match_score: 94,
-                    summary: "Responsible for engineering localization pipelines, regex filters, and parsing software code repositories for international delivery markets.",
-                    skills_gaps: [],
-                    link: hubUrl
-                }
-            ];
-            processDiscoveredJobs(mockJobs);
+        const response = await fetch('/api/gemini/analyze-hub', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: hubUrl, profile })
+        });
+        const jobs = await response.json();
+        if (!response.ok) {
+            throw new Error(jobs.error || `Hub scan request failed with status ${response.status}`);
         }
+        processDiscoveredJobs(jobs, extraFields);
     } catch (err) {
         console.error("❌ Hub Scan Execution Fault Error:", err);
         window.showAlert('Execution Error', `Pipeline error: ${err.message}`, 'error');
@@ -79,7 +55,7 @@ export async function analyzeCareersHub() {
  * Saturates the job payload data structure with all syntax variants
  * to fully bypass strict filters inside uiManager.js.
  */
-function processDiscoveredJobs(rawJobsArray) {
+function processDiscoveredJobs(rawJobsArray, extraFields = {}) {
     if (!rawJobsArray || rawJobsArray.length === 0) {
         window.showAlert('No Jobs Found', 'The hub scan completed but found no valid openings.', 'warning');
         return;
@@ -128,7 +104,9 @@ function processDiscoveredJobs(rawJobsArray) {
             link: job.link || "",
             match_score: finalizedScore,
             summary: textSummary,
-            skills_gaps: cleanedGaps
+            skills_gaps: cleanedGaps,
+            _reposted: job._reposted || false,
+            ...extraFields
         };
     });
 

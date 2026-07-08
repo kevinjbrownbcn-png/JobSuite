@@ -32,7 +32,6 @@
 					<div class="flex gap-6 mt-4 text-sm text-gray-400">
 						<button id="tab-btn-metrics" onclick="switchTab('metrics')" class="pb-2 cursor-pointer transition-colors tab-active">Dashboard Metrics</button>
 						<button id="tab-btn-data" onclick="switchTab('data')" class="pb-2 cursor-pointer transition-colors hover:text-white">Applications Viewer</button>
-						<button id="tab-btn-settings" onclick="switchTab('settings')" class="pb-2 cursor-pointer transition-colors hover:text-white">⚙ Settings</button>
 					</div>
 				</div>
 				<button onclick="fetchDashboardData()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2 px-4 rounded transition-all cursor-pointer shadow-md">
@@ -45,7 +44,7 @@
 			</div>
 
 			<div id="tab-metrics" class="space-y-6 hidden">
-				<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+				<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
 					<div class="card p-4 accent-glow">
 						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Applications</p>
 						<p id="kpi-total" class="text-3xl font-bold text-white mt-1">0</p>
@@ -65,6 +64,10 @@
 					<div class="card p-4 border-t-3 border-teal-500">
 						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top Category</p>
 						<p id="kpi-top-category" class="text-xl font-bold text-teal-400 mt-2 truncate">—</p>
+					</div>
+					<div class="card p-4 border-t-3 border-cyan-500">
+						<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Avg Response Time</p>
+						<p id="kpi-avg-response" class="text-3xl font-bold text-cyan-400 mt-1">—</p>
 					</div>
 				</div>
 
@@ -173,6 +176,16 @@
 				}
 			}
 
+			// Mirrors jobsuite_api.py's _format_duration_days — plain day count under
+			// 14 days, otherwise a "Nw Nd" breakdown, so the KPI reads the same way
+			// the per-row Response Time text does.
+			function formatDurationDays(days) {
+				if (days < 14) return days === 1 ? '1 day' : `${days} days`;
+				const weeks = Math.floor(days / 7);
+				const remDays = days % 7;
+				return remDays > 0 ? `${weeks}w ${remDays}d` : `${weeks}w`;
+			}
+
 			async function processAndRenderAll() {
 				await window.roleDictionaryReady;
 
@@ -188,6 +201,8 @@
 
 				let interviewCount = 0;
 				let staleCount = 0;
+				let responseDaysSum = 0;
+				let responseDaysCount = 0;
 
 				AppState.processedData = AppState.rawLengthData.map(row => {
 					const age = calculateDaysSince(row["Date Applied"]);
@@ -230,6 +245,11 @@
 					if (!matched) roleCounts["Uncategorized / Other"]++;
 
 					if (CONFIG.INTERVIEW_KEYWORDS.some(keyword => lowerStatus.includes(keyword))) interviewCount++;
+
+					if (row["_response_days"] !== null && row["_response_days"] !== undefined && status !== "Radio Silence") {
+						responseDaysSum += row["_response_days"];
+						responseDaysCount++;
+					}
 				});
 
 				let topCategory = "—";
@@ -243,6 +263,9 @@
 				document.getElementById('kpi-stale').innerText = staleCount;
 				document.getElementById('kpi-top-category').innerText = topCategory;
 				document.getElementById('kpi-conversion').innerText = (total > 0 ? Math.round((interviewCount / total) * 100) : 0) + '%';
+				document.getElementById('kpi-avg-response').innerText = responseDaysCount > 0
+					? formatDurationDays(Math.round(responseDaysSum / responseDaysCount))
+					: '—';
 
 				populateDropdownFilters(categoryCounts, statusCounts, sourceCounts);
 				renderCharts(statusCounts, channelCounts, roleCounts);

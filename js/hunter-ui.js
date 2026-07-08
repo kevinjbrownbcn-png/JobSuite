@@ -11,6 +11,14 @@ function escapeHTML(str) {
         .replace(/'/g, '&#39;');
 }
 
+// Continuous red (0%) -> yellow (50%) -> green (100%) scale, matching the color-scale
+// conditional formatting the match scores used to have in the spreadsheet.
+function scoreToColor(score) {
+    if (score === null || score === undefined || score === '' || isNaN(score)) return '#64748b';
+    const pct = Math.max(0, Math.min(100, Number(score))) / 100;
+    return `hsl(${pct * 120}, 70%, 45%)`;
+}
+
 export function updateSelectedCounter() {
     const totalCards = document.querySelectorAll('.job-card').length;
     const checkedCards = document.querySelectorAll('.job-card-checkbox:checked').length;
@@ -149,11 +157,8 @@ export function renderJobCards(jobs) {
         card.className = "job-card";
         card.dataset.jobData = JSON.stringify(job);
 
-        // Dynamically compute score badge coloring
-        let scoreColor = "#64748b";
-        if (job.match_score >= 85) scoreColor = "#10b981";
-        else if (job.match_score >= 70) scoreColor = "#eab308";
-        else if (job.match_score > 0) scoreColor = "#ef4444";
+        // Score badge coloring: continuous red -> yellow -> green scale
+        const scoreColor = scoreToColor(job.match_score);
 
         const skillGapsHTML = Array.isArray(job.skills_gaps) && job.skills_gaps.length > 0
             ? job.skills_gaps.map(g => `<span class="badge-gap">${escapeHTML(g)}</span>`).join('')
@@ -186,6 +191,7 @@ export function renderJobCards(jobs) {
                         ${safeLink
                             ? `<a href="${escapeHTML(safeLink)}" target="_blank" class="card-link-anchor" title="${escapeHTML(safeLink)}" style="margin: 0;">Open Original Job Website ↗</a><span class="link-status-pill link-status-checking">⏳</span>`
                             : '<span></span>'}
+                        ${job._reposted ? '<span class="link-status-pill link-status-repost" title="Previously discarded, reappeared in this scan">↻ Reposted</span>' : ''}
                     </div>
                     <button
                         class="single-export-btn"
@@ -216,69 +222,6 @@ export function renderJobCards(jobs) {
     }
 }
 
-
-export function addToHistoryLog(title, company, link, location, score) {
-    let history = [];
-    try {
-        history = JSON.parse(localStorage.getItem('job_hunter_audit_ledger') || '[]');
-    } catch(e) { history = []; }
-
-    history.unshift({
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        title: title,
-        company: company,
-        link: link,
-        location: location,
-        score: score
-    });
-
-    localStorage.setItem('job_hunter_audit_ledger', JSON.stringify(history.slice(0, 50)));
-}
-
-export function renderHistoryLogTable() {
-    const tbody = document.getElementById('history-log-tbody');
-    const emptyState = document.getElementById('history-empty-state');
-    if (!tbody) return;
-
-    let history = [];
-    try {
-        history = JSON.parse(localStorage.getItem('job_hunter_audit_ledger') || '[]');
-    } catch(e) { history = []; }
-
-    tbody.innerHTML = "";
-    
-    if (history.length === 0) {
-        if (emptyState) emptyState.classList.remove('hidden');
-        return;
-    }
-
-    if (emptyState) emptyState.classList.add('hidden');
-
-    history.forEach(item => {
-        const row = document.createElement('tr');
-        const safeLink = item.link && item.link.startsWith('http') ? item.link : null;
-        row.innerHTML = `
-            <td style="color: #64748b; font-size: 11px;">${escapeHTML(item.timestamp)}</td>
-            <td style="font-weight: 600; color: #f8fafc;">${escapeHTML(item.title)}</td>
-            <td style="color: #cbd5e1;">${escapeHTML(item.company)}</td>
-            <td style="color: #94a3b8; font-size: 12px;">${escapeHTML(item.location)}</td>
-            <td style="text-align: center;"><span style="color: #2dd4bf; font-weight: bold;">${escapeHTML(String(item.score))}%</span></td>
-            <td style="text-align: right;">
-                ${safeLink
-                    ? `<a href="${escapeHTML(safeLink)}" target="_blank" style="color: #38bdf8; text-decoration: none; font-size: 11px;">View Posting ↗</a>`
-                    : `<span style="color: #475569; font-size: 11px;">No Link</span>`
-                }
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
-}
-
-export function clearHistoryLog() {
-    localStorage.removeItem('job_hunter_audit_ledger');
-    renderHistoryLogTable();
-    window.showAlert('Ledger Cleared', 'All local historical spreadsheet logging arrays wiped clean.', 'success');
-}
 
 // Toast dismiss helper (also used by close buttons)
 function dismissToast(toast) {

@@ -12,5 +12,10 @@
         { "value": "Localization",  "label": "Localization Operations" },
         { "value": "Data Analysis", "label": "Data Analysis" },
         { "value": "Tech Support",  "label": "Tech Support" }
+    ],
+    "postingSources": [
+        "LinkedIn", "Company page", "Glassdoor", "Remotive", "JobLeads", "JobSora",
+        "JobGether", "LocalizationAcademy", "Trabajo.org", "Word of mouth",
+        "Barcelona Active IT Academy", "Apple"
     ]
 }

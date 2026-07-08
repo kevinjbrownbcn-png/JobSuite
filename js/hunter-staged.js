@@ -1,0 +1,208 @@
+// Staged Matches — replaces the old localStorage export-history ledger with the
+// real, persisted `matches` table. Lifecycle: Draft -> New -> Processed -> Applied ->
+// Migrated to Tracker, or Draft/New/Processed -> Discarded -> Purged.
+
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Continuous red (0%) -> yellow (50%) -> green (100%) scale, matching the color-scale
+// conditional formatting the match scores used to have in the spreadsheet.
+function scoreToColor(score) {
+    if (score === null || score === undefined || score === '' || isNaN(score)) return '#64748b';
+    const pct = Math.max(0, Math.min(100, Number(score))) / 100;
+    return `hsl(${pct * 120}, 70%, 45%)`;
+}
+
+const STATUS_LABELS = {
+    'Draft':               { text: 'Draft',           color: '#64748b' },
+    'New':                 { text: 'Queued for Prep',  color: '#eab308' },
+    'Processed':           { text: 'Docs Ready',       color: '#38bdf8' },
+    'Applied':             { text: 'Applied',          color: '#a855f7' },
+    'Migrated to Tracker': { text: '✓ In Tracker', color: '#10b981' },
+    'Discarded':           { text: 'Discarding…',     color: '#f97316' },
+    'Purged':              { text: 'Discarded',        color: '#6b7280' },
+    'N/A':                 { text: 'N/A',               color: '#6b7280' }
+};
+
+async function patchMatch(id, statusValue, loadingMessage) {
+    const loader = document.getElementById('loading-state');
+    const loaderTitle = document.getElementById('loader-title');
+    const loaderDesc = document.getElementById('loader-desc');
+    if (loader) {
+        loader.classList.remove('hidden');
+        if (loaderTitle) loaderTitle.textContent = loadingMessage;
+        if (loaderDesc) loaderDesc.textContent = 'Waiting for Make.com to finish and respond — this can take a little while.';
+    }
+
+    try {
+        const response = await fetch(`/api/matches/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: statusValue })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+
+        if (data._discard_warning) {
+            window.showAlert('Discarded (cleanup pending)', `Marked as Discarded, but the Drive cleanup didn't run: ${data._discard_warning}. You can leave it — it'll stay Discarded until cleanup succeeds.`, 'warning');
+        } else {
+            window.showAlert('Updated', `Match moved to "${data.status}".`, 'success');
+        }
+        await renderStagedMatchesTable();
+    } catch (err) {
+        window.showAlert('Update Failed', err.message, 'error');
+    } finally {
+        if (loader) loader.classList.add('hidden');
+    }
+}
+
+async function discardMatch(id) {
+    if (!window.confirm('Discard this staged match? Its generated CV/cover letter (if any) will be trashed in Drive.')) return;
+    await patchMatch(id, 'Discarded', 'Discarding match, cleaning up generated docs…');
+}
+
+function toggleDescriptionEditor(match, rowEl) {
+    const next = rowEl.nextElementSibling;
+    if (next && next.classList.contains('desc-editor-row')) {
+        next.remove();
+        return;
+    }
+    document.querySelectorAll('.desc-editor-row').forEach(el => el.remove());
+
+    const editorRow = document.createElement('tr');
+    editorRow.className = 'desc-editor-row';
+
+    const td = document.createElement('td');
+    td.colSpan = 4;
+    td.style.cssText = 'padding: 12px; background: #0d1117;';
+
+    const textarea = document.createElement('textarea');
+    textarea.value = match.job_description || '';
+    textarea.placeholder = 'No job description on file.';
+    textarea.style.cssText = 'width:100%; min-height:140px; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:8px; font-size:12px; font-family:inherit; box-sizing:border-box; resize:vertical;';
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'margin-top:8px; display:flex; gap:8px;';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Save Description';
+    saveBtn.style.cssText = 'background:#0d9488;color:#fff;border:none;padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;';
+    saveBtn.onclick = async () => {
+        try {
+            const response = await fetch(`/api/matches/${match.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_description: textarea.value })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+            window.showAlert('Saved', 'Job description updated.', 'success');
+            await renderStagedMatchesTable();
+        } catch (err) {
+            window.showAlert('Save Failed', err.message, 'error');
+        }
+    };
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = 'background:none;color:#94a3b8;border:1px solid #334155;padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;';
+    cancelBtn.onclick = () => editorRow.remove();
+
+    btnRow.append(saveBtn, cancelBtn);
+    td.append(textarea, btnRow);
+    editorRow.appendChild(td);
+    rowEl.after(editorRow);
+}
+
+export async function renderStagedMatchesTable() {
+    const tbody = document.getElementById('staged-matches-tbody');
+    const emptyState = document.getElementById('staged-matches-empty');
+    if (!tbody) return;
+
+    let matches = [];
+    try {
+        const response = await fetch('/api/matches');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        matches = await response.json();
+    } catch (err) {
+        console.error('Failed to load staged matches:', err);
+        if (window.showAlert) window.showAlert('Load Failed', `Could not load staged matches: ${err.message}`, 'error');
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    if (!matches || matches.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+    }
+    if (emptyState) emptyState.classList.add('hidden');
+
+    matches.forEach(match => {
+        const row = document.createElement('tr');
+        const statusInfo = STATUS_LABELS[match.status] || { text: match.status, color: '#64748b' };
+        const safeLink = match.job_url && match.job_url.startsWith('http') ? match.job_url : null;
+
+        const tdTitle = document.createElement('td');
+        tdTitle.innerHTML = `<span style="font-weight:600; color:#f8fafc;">${escapeHTML(match.job_title)}</span><br><span style="color:#94a3b8; font-size:11px;">${escapeHTML(match.company)}</span>`;
+
+        const tdScore = document.createElement('td');
+        tdScore.style.textAlign = 'center';
+        tdScore.innerHTML = `<span style="color:${scoreToColor(match.match_score)}; font-weight:bold;">${escapeHTML(String(match.match_score ?? '—'))}%</span>`;
+
+        // Same visual treatment as the Action column's buttons: dark fill, colored
+        // text, matching colored border — texts/colors themselves come from STATUS_LABELS.
+        const tdStatus = document.createElement('td');
+        tdStatus.innerHTML = `<span style="display:inline-block; background:#1e293b; color:${statusInfo.color}; border:1px solid ${statusInfo.color}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600;">${escapeHTML(statusInfo.text)}</span>`;
+
+        const tdAction = document.createElement('td');
+        tdAction.style.textAlign = 'right';
+
+        if (safeLink) {
+            const linkA = document.createElement('a');
+            linkA.href = safeLink;
+            linkA.target = '_blank';
+            linkA.style.cssText = 'color:#38bdf8;text-decoration:none;font-size:11px;margin-right:10px;';
+            linkA.textContent = 'View ↗';
+            tdAction.appendChild(linkA);
+        }
+
+        const descBtn = document.createElement('button');
+        descBtn.style.cssText = 'background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+        descBtn.textContent = 'Edit Description';
+        descBtn.onclick = () => toggleDescriptionEditor(match, row);
+        tdAction.appendChild(descBtn);
+
+        if (match.status === 'Draft' || match.status === 'New') {
+            const btn = document.createElement('button');
+            btn.style.cssText = 'background:#1e293b;color:#eab308;border:1px solid #eab308;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+            btn.textContent = match.status === 'New' ? 'Retry: Send to Prep' : 'Send to Prep';
+            btn.onclick = () => patchMatch(match.id, 'New', 'Requesting CV/cover letter generation…');
+            tdAction.appendChild(btn);
+        } else if (match.status === 'Processed') {
+            const btn = document.createElement('button');
+            btn.style.cssText = 'background:#1e293b;color:#a855f7;border:1px solid #a855f7;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+            btn.textContent = 'Mark as Applied';
+            btn.onclick = () => patchMatch(match.id, 'Applied', 'Recording application…');
+            tdAction.appendChild(btn);
+        }
+
+        if (!['Migrated to Tracker', 'Purged'].includes(match.status)) {
+            const discardBtn = document.createElement('button');
+            discardBtn.style.cssText = 'background:none;color:#ef4444;border:1px solid #ef4444;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;';
+            discardBtn.textContent = match.status === 'Discarded' ? 'Retry Cleanup' : 'Discard';
+            discardBtn.onclick = () => discardMatch(match.id);
+            tdAction.appendChild(discardBtn);
+        }
+
+        row.append(tdTitle, tdScore, tdStatus, tdAction);
+        tbody.appendChild(row);
+    });
+}

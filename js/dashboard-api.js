@@ -59,3 +59,40 @@ function calculateDaysSince(dateString) {
 function convertToComparableDate(dateString) {
     return parseDate(dateString) ?? new Date(0);
 }
+
+// Persists a single field edit (Status, Notes) back to the local API and updates
+// the in-memory copy so the table/KPIs stay in sync without a full refetch.
+async function updateApplicationField(id, field, value) {
+    try {
+        const response = await fetch(`/api/applications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [field]: value })
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+
+        const updatedRow = await response.json();
+        if (updatedRow._archive_warning) {
+            console.warn('[dashboard] Archive webhook warning:', updatedRow._archive_warning);
+        }
+
+        const idx = AppState.processedData.findIndex(row => row._id === id);
+        if (idx !== -1) {
+            const age = calculateDaysSince(updatedRow['Date Applied']);
+            AppState.processedData[idx] = { ...updatedRow, _calculatedAge: age === null ? -1 : age };
+        }
+        const rawIdx = AppState.rawLengthData.findIndex(row => row._id === id);
+        if (rawIdx !== -1) AppState.rawLengthData[rawIdx] = updatedRow;
+
+        return updatedRow;
+    } catch (error) {
+        console.error('Failed to update application field:', error);
+        window.showAlert ? window.showAlert('Update Failed', error.message, 'error')
+                          : alert(`Update failed: ${error.message}`);
+        throw error;
+    }
+}

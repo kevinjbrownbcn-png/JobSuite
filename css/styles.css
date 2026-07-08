@@ -179,6 +179,7 @@ tr:hover td { background-color: rgba(15, 23, 42, 0.3); }
 .link-status-live     { background: rgba(52, 211,153, 0.15); color: #34d399; }
 .link-status-dead     { background: rgba(248,113,113, 0.15); color: #f87171; }
 .link-status-warn     { background: rgba(251,191, 36, 0.15); color: #fbbf24; }
+.link-status-repost   { background: rgba(167,139,250, 0.15); color: #a78bfa; }
 .hidden { display: none !important; }
 
 /* ===================================================================

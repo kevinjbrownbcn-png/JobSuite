@@ -1,19 +1,5 @@
 import { saveParamState } from './hunter-ui.js';
 
-export let currentApiKey = "";
-
-export async function getApiKeyFromConfig() {
-    try {
-        const response = await window.fetch('/config.json');
-        if (!response.ok) throw new Error("Could not read root config file properties.");
-        const configData = await response.json();
-        return configData.gemini_api_key || localStorage.getItem('gemini_api_key') || '';
-    } catch (error) {
-        console.warn("Config file bypass. Using local storage container fallback:", error);
-        return localStorage.getItem('gemini_api_key') || '';
-    }
-}
-
 async function loadHunterProfiles() {
     try {
         const response = await window.fetch('/hunter-profiles.json');
@@ -56,26 +42,88 @@ function buildProfileDropdowns(profiles) {
     });
 }
 
-export async function loadParamState() {
-    const cachedGDrive = localStorage.getItem('gdrive_webhook') || '';
-    const cachedExport = localStorage.getItem('export_webhook') || '';
+const POSTING_SOURCE_SELECT_IDS = [
+    'manual-text-posting-source', 'direct-analysis-posting-source', 'hub-analysis-posting-source'
+];
 
-    const gdriveInput = document.getElementById('gdrive_webhook');
-    const exportInput = document.getElementById('export_webhook');
-    if (gdriveInput) gdriveInput.value = cachedGDrive;
-    if (exportInput) exportInput.value = cachedExport;
+function buildPostingSourceDropdowns(profiles) {
+    const sources = profiles.postingSources || [];
+    POSTING_SOURCE_SELECT_IDS.forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = '';
+        const blankOpt = document.createElement('option');
+        blankOpt.value = '';
+        blankOpt.textContent = '— Select —';
+        sel.appendChild(blankOpt);
+        sources.forEach(source => {
+            const opt = document.createElement('option');
+            opt.value = source;
+            opt.textContent = source;
+            sel.appendChild(opt);
+        });
+        const otherOpt = document.createElement('option');
+        otherOpt.value = '__other__';
+        otherOpt.textContent = 'Other...';
+        sel.appendChild(otherOpt);
 
-    const saveBtn = document.getElementById('save-sync-routes-btn');
-    if (saveBtn) {
-        saveBtn.onclick = function() {
-            const newGDrive = document.getElementById('gdrive_webhook').value.trim();
-            const newExport = document.getElementById('export_webhook').value.trim();
-            localStorage.setItem('gdrive_webhook', newGDrive);
-            localStorage.setItem('export_webhook', newExport);
-            window.showAlert('Route Configured', 'All Webhook pipeline routing configurations saved successfully.', 'success');
-        };
+        const otherInput = document.getElementById(id + '-other');
+        if (otherInput) {
+            sel.onchange = () => {
+                otherInput.classList.toggle('hidden', sel.value !== '__other__');
+            };
+        }
+    });
+}
+
+// Adds a newly-learned source as an option on every Posting Source dropdown (before
+// "Other..."), so it's immediately pickable for the rest of this session without a reload.
+function addPostingSourceOption(newSource) {
+    POSTING_SOURCE_SELECT_IDS.forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const alreadyPresent = Array.from(sel.options).some(o => o.value.toLowerCase() === newSource.toLowerCase());
+        if (alreadyPresent) return;
+        const opt = document.createElement('option');
+        opt.value = newSource;
+        opt.textContent = newSource;
+        const otherOpt = Array.from(sel.options).find(o => o.value === '__other__');
+        sel.insertBefore(opt, otherOpt || null);
+    });
+}
+
+const _persistedSources = new Set(); // avoids re-POSTing the same value repeatedly in one session
+
+// Persists a custom "Other" entry to hunter-profiles.json (via the local API) so it
+// shows up in the dropdown for future sessions too — best-effort, doesn't block the caller.
+function persistPostingSource(value) {
+    if (!value || _persistedSources.has(value)) return;
+    _persistedSources.add(value);
+    fetch('/api/posting-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: value })
+    })
+        .then(() => addPostingSourceOption(value))
+        .catch(err => console.warn('[hunter-config] Could not persist new posting source:', err));
+}
+
+// Reads the effective value of a Posting Source dropdown, falling back to the
+// adjacent "Other" text input when that option is selected — and persisting genuinely
+// new custom values so they don't need re-typing (or a code change) next time.
+export function getPostingSourceValue(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return '';
+    if (sel.value === '__other__') {
+        const otherInput = document.getElementById(selectId + '-other');
+        const value = otherInput ? otherInput.value.trim() : '';
+        if (value) persistPostingSource(value);
+        return value;
     }
+    return sel.value;
+}
 
+export async function loadParamState() {
     // Load profiles JSON — populates roles list and profile dropdowns
     const profiles = await loadHunterProfiles();
     const listContainer = document.getElementById('roles-checkbox-list');
@@ -83,6 +131,7 @@ export async function loadParamState() {
     if (profiles) {
         if (listContainer) buildRolesList(profiles, listContainer);
         buildProfileDropdowns(profiles);
+        buildPostingSourceDropdowns(profiles);
     }
 
     const savedState = localStorage.getItem('job_hunter_param_state') || localStorage.getItem('global_shared_hunter_param_state');
@@ -146,14 +195,4 @@ function attachChangeListeners() {
     if (loc) loc.oninput  = saveParamState;
     if (tm)  tm.onchange  = saveParamState;
     if (foc) foc.oninput  = saveParamState;
-}
-
-export async function fetchBaseCVText(hookUrl, loadingState) {
-    document.getElementById('loader-title').textContent = "Accessing Google Drive...";
-    document.getElementById('loader-desc').textContent = "Downloading your base resume mapping file securely via Make.com webhook bridge.";
-    loadingState.classList.remove('hidden');
-
-    const gdriveResponse = await window.fetch(hookUrl, { method: 'POST' });
-    if (!gdriveResponse.ok) throw new Error("Could not pull file text from Drive Webhook.");
-    return await gdriveResponse.text();
 }

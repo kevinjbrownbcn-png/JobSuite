@@ -8,7 +8,7 @@
 
 <script>
         window.switchTab = function(tabId) {
-            ['hunt', 'manual', 'history', 'make'].forEach(function(t) {
+            ['hunt', 'manual', 'staged'].forEach(function(t) {
                 var navBtn = document.getElementById('tab-' + t);
                 var contentBlock = document.getElementById('content-' + t);
 
@@ -21,8 +21,8 @@
                 }
             });
 
-            if (tabId === 'history' && typeof window.renderHistoryLogTable === 'function') {
-                window.renderHistoryLogTable();
+            if (tabId === 'staged' && typeof window.renderStagedMatchesTable === 'function') {
+                window.renderStagedMatchesTable();
             }
         };
 
@@ -49,18 +49,18 @@
 
     <script type="module">
         import { loadParamState } from './js/hunter-config.js';
-        import { renderJobCards, updateSelectedCounter, addCustomRoleOption, toggleSelectAll, clearHistoryLog, renderHistoryLogTable } from './js/hunter-ui.js';
+        import { renderJobCards, updateSelectedCounter, addCustomRoleOption, toggleSelectAll } from './js/hunter-ui.js';
         import { scanWebForJobs } from './js/hunter-scanner.js';
         import { exportJobsToTracker } from './js/hunter-exporter.js';
         import { analyzeCareersHub } from './js/hunter-hub.js';
+        import { renderStagedMatchesTable } from './js/hunter-staged.js';
 
         window.renderJobCards = renderJobCards;
         window.updateSelectedCounter = updateSelectedCounter;
-        window.renderHistoryLogTable = renderHistoryLogTable;
+        window.renderStagedMatchesTable = renderStagedMatchesTable;
         window.analyzeCareersHub = analyzeCareersHub;
         window.addCustomRoleOption = addCustomRoleOption;
         window.toggleSelectAll = toggleSelectAll;
-        window.clearHistoryLog = clearHistoryLog;
         window.scanWebForJobs = scanWebForJobs;
         window.exportJobsToTracker = exportJobsToTracker;
 
@@ -116,8 +116,7 @@
         <nav>
             <button onclick="window.switchTab('hunt')" id="tab-hunt" class="active">🔎 Web Job Scanner</button>
             <button onclick="window.switchTab('manual')" id="tab-manual">🎯 Manual Audit</button>
-            <button onclick="window.switchTab('history')" id="tab-history">⏳ Export History</button>
-            <button onclick="window.switchTab('make')" id="tab-make">🔗 Connection Settings</button>
+            <button onclick="window.switchTab('staged')" id="tab-staged">🗂️ Staged Matches</button>
         </nav>
     </header>
 
@@ -223,6 +222,17 @@
                             <label for="manual-text-url" class="input-label">Job Posting URL (Optional)</label>
                             <input type="text" id="manual-text-url" placeholder="https://... (saved to tracker)" class="text-input">
                         </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="manual-text-applied-through" class="input-label">Applied Through</label>
+                            <input type="text" id="manual-text-applied-through" placeholder="e.g. Company Workday Site" class="text-input">
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="manual-text-posting-source" class="input-label">Posting Source</label>
+                            <select id="manual-text-posting-source" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                                <!-- populated from hunter-profiles.json -->
+                            </select>
+                            <input type="text" id="manual-text-posting-source-other" placeholder="Enter source..." class="text-input hidden" style="margin-top: 6px;">
+                        </div>
                         <div class="input-group" style="margin-top: 8px; margin-bottom: 8px;">
                             <label for="manual-profile" class="input-label">Alignment Context</label>
                             <select id="manual-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
@@ -252,6 +262,17 @@
                             <label for="direct-analysis-url" class="input-label">Job Posting Link</label>
                             <input type="text" id="direct-analysis-url" placeholder="https://linkedin.com/jobs/view/..." class="text-input">
                         </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="direct-analysis-applied-through" class="input-label">Applied Through</label>
+                            <input type="text" id="direct-analysis-applied-through" placeholder="e.g. Company Workday Site" class="text-input">
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="direct-analysis-posting-source" class="input-label">Posting Source</label>
+                            <select id="direct-analysis-posting-source" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                                <!-- populated from hunter-profiles.json -->
+                            </select>
+                            <input type="text" id="direct-analysis-posting-source-other" placeholder="Enter source..." class="text-input hidden" style="margin-top: 6px;">
+                        </div>
                     </div>
                     <button onclick="window.analyzeManualURL()" class="btn-primary btn-amber" style="margin-top: auto;">📥 Analyze URL Posting</button>
                 </div>
@@ -271,6 +292,17 @@
                             <label for="hub-analysis-url" class="input-label">Careers Portal Main Index URL</label>
                             <input type="text" id="hub-analysis-url" placeholder="https://translated.applytojob.com/apply/" class="text-input">
                         </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="hub-analysis-applied-through" class="input-label">Applied Through</label>
+                            <input type="text" id="hub-analysis-applied-through" placeholder="e.g. Company Page" class="text-input">
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label for="hub-analysis-posting-source" class="input-label">Posting Source</label>
+                            <select id="hub-analysis-posting-source" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                                <!-- populated from hunter-profiles.json -->
+                            </select>
+                            <input type="text" id="hub-analysis-posting-source-other" placeholder="Enter source..." class="text-input hidden" style="margin-top: 6px;">
+                        </div>
                     </div>
                     <button onclick="window.analyzeCareersHub()" class="btn-primary" style="background-color: #a855f7; margin-top: auto;">🔮 Batch Process Hub</button>
                 </div>
@@ -278,55 +310,33 @@
             </div>
         </div>
 
-        <div id="content-history" class="tab-content-hidden space-y-6">
+        <div id="content-staged" class="tab-content-hidden space-y-6">
             <div class="card-panel" style="justify-content: flex-start; gap: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 14px;">
                     <div>
-                        <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Spreadsheet Export Ledger</h2>
-                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Global cross-path audit log tracking roles pushed out of the dashboard app.</p>
+                        <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Staged Matches</h2>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">AI-scored roles exported from the scanner. Send a match to prep to generate a tailored CV/cover letter, then mark it Applied once submitted to migrate it into the Pipeline Analytics tracker.</p>
                     </div>
-                    <button onclick="window.clearHistoryLog()" class="btn-clear-history">Clear Audit History</button>
+                    <button onclick="window.renderStagedMatchesTable()" class="btn-clear-history">Refresh</button>
                 </div>
 
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th style="width: 15%;">Timestamp</th>
-                                <th style="width: 25%;">Job Title</th>
-                                <th style="width: 20%;">Company</th>
-                                <th style="width: 15%;">Location</th>
-                                <th style="width: 12%; text-align: center;">Compatibility</th>
-                                <th style="width: 13%; text-align: right;">Source Link</th>
+                                <th style="width: 40%;">Job Title / Company</th>
+                                <th style="width: 12%; text-align: center;">Match Score</th>
+                                <th style="width: 18%;">Status</th>
+                                <th style="width: 30%; text-align: right;">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="history-log-tbody"></tbody>
+                        <tbody id="staged-matches-tbody"></tbody>
                     </table>
                 </div>
-                <div id="history-empty-state" class="hidden history-empty-text">No exported entries recorded inside local storage log arrays yet.</div>
+                <div id="staged-matches-empty" class="hidden history-empty-text">No staged matches yet — export a role from the Web Job Scanner or Manual Audit to see it here.</div>
             </div>
         </div>
 
-        <div id="content-make" class="tab-content-hidden space-y-6">
-            <div class="card-panel" style="justify-content: flex-start; gap: 20px;">
-                <div>
-                    <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Make.com Sync Configuration</h2>
-                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Establish secure webhook links to automatically handle background sync loops.</p>
-                </div>
-
-                <div class="space-y-4" style="width: 100%;">
-                    <div class="input-group">
-                        <label for="gdrive_webhook" class="input-label">GDrive Fetch Webhook URL</label>
-                        <input type="text" id="gdrive_webhook" placeholder="https://hook.us1.make.com/xxxxxxxxxxxx" class="text-input">
-                    </div>
-                    <div class="input-group">
-                        <label for="export_webhook" class="input-label">Spreadsheet Writer Webhook URL</label>
-                        <input type="text" id="export_webhook" placeholder="https://hook.us1.make.com/xxxxxxxxxxxx" class="text-input">
-                    </div>
-                    <button id="save-sync-routes-btn" class="btn-primary" style="width: auto; padding: 10px 24px; margin-top: 8px;">Save Sync Route</button>
-                </div>
-            </div>
-        </div>
     </main>
 
     <div id="toast-wrapper-container" class="toast-wrapper"></div>

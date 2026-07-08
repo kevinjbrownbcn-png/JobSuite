@@ -151,21 +151,40 @@ function filterAndRenderDataView() {
         companySpan.textContent = company;
         tdTitle.appendChild(companySpan);
 
-        // Category cell
+        // Category cell — each category gets a stable, distinct color
         const tdCat = document.createElement('td');
         tdCat.className = "py-3";
+        const catColor = colorForKey(category, CONFIG.CATEGORY_COLORS, CONFIG.CATEGORY_COLOR_PALETTE, '#9ca3af');
         const catSpan = document.createElement('span');
-        catSpan.className = "px-2 py-0.5 rounded bg-[#21262d] border border-[#30363d] text-gray-400 text-[11px]";
+        catSpan.className = "px-2 py-0.5 rounded bg-[#21262d] border text-[11px] font-medium";
+        catSpan.style.color = catColor;
+        catSpan.style.borderColor = catColor + '66'; // ~40% alpha border to match the text color
         catSpan.textContent = category;
         tdCat.appendChild(catSpan);
 
-        // Status cell
+        // Status cell — editable dropdown, PATCHes the local API on change. Each option
+        // (and the control itself, matching whichever is selected) gets a sentiment color.
         const tdStatus = document.createElement('td');
         tdStatus.className = "py-3";
-        const statusSpan = document.createElement('span');
-        statusSpan.className = "px-2 py-0.5 rounded bg-[#21262d] border border-[#30363d] text-emerald-400 font-medium";
-        statusSpan.textContent = status;
-        tdStatus.appendChild(statusSpan);
+        const statusSelect = document.createElement('select');
+        statusSelect.className = "px-2 py-1 rounded bg-[#21262d] border border-[#30363d] font-medium text-xs focus:outline-none focus:border-emerald-500 cursor-pointer";
+        const statusOptions = new Set(CONFIG.APPLICATION_STATUSES);
+        statusOptions.add(status); // keeps legacy/unlisted values (e.g. from seeded data) selectable
+        statusOptions.forEach(opt => {
+            const optionEl = document.createElement('option');
+            optionEl.value = opt;
+            optionEl.textContent = opt;
+            optionEl.style.color = CONFIG.STATUS_COLORS[opt] || CONFIG.STATUS_COLOR_FALLBACK;
+            optionEl.style.backgroundColor = '#0d1117';
+            if (opt === status) optionEl.selected = true;
+            statusSelect.appendChild(optionEl);
+        });
+        statusSelect.style.color = CONFIG.STATUS_COLORS[status] || CONFIG.STATUS_COLOR_FALLBACK;
+        statusSelect.onchange = () => {
+            statusSelect.style.color = CONFIG.STATUS_COLORS[statusSelect.value] || CONFIG.STATUS_COLOR_FALLBACK;
+            updateApplicationField(row._id, 'status', statusSelect.value);
+        };
+        tdStatus.appendChild(statusSelect);
 
         // Source + Channel cell
         const tdSrc = document.createElement('td');
@@ -180,11 +199,19 @@ function filterAndRenderDataView() {
         chanSpan.textContent = `via ${channel}`;
         tdSrc.appendChild(chanSpan);
 
-        // Notes cell
+        // Notes cell — editable, PATCHes the local API on blur (only if changed)
         const tdNotes = document.createElement('td');
-        tdNotes.className = "py-3 text-gray-400 max-w-xs truncate italic";
-        tdNotes.title = notes;
-        tdNotes.textContent = notes || '—';
+        tdNotes.className = "py-3 max-w-xs";
+        const notesInput = document.createElement('input');
+        notesInput.type = 'text';
+        notesInput.value = notes;
+        notesInput.placeholder = '—';
+        notesInput.title = notes;
+        notesInput.className = "w-full bg-transparent text-gray-400 italic text-xs border border-transparent hover:border-[#30363d] focus:border-emerald-500 focus:bg-[#0d1117] focus:not-italic rounded px-1 py-0.5 focus:outline-none";
+        notesInput.addEventListener('blur', () => {
+            if (notesInput.value !== notes) updateApplicationField(row._id, 'notes', notesInput.value);
+        });
+        tdNotes.appendChild(notesInput);
 
         tr.append(tdDate, tdUpdate, tdTitle, tdCat, tdStatus, tdSrc, tdNotes);
         tableBody.appendChild(tr);
