@@ -307,11 +307,16 @@ else:
         if st.button(f"📦 Export {len(to_export)} Selected to Staged Matches", type="primary", disabled=not to_export):
             conn = jobsuite_db.get_connection()
             try:
-                status, body = jobsuite_api.create_matches(conn, {"jobs": to_export})
+                status, body = jobsuite_api.create_matches(conn, {"jobs": to_export}, config)
             finally:
                 conn.close()
             if status == 201:
-                st.success(f"Exported {body['count']} job(s) to Staged Matches.")
+                msg = f"Exported {body['count']} job(s) to Staged Matches."
+                if body.get("_auto_docgen_sent"):
+                    msg += f" {len(body['_auto_docgen_sent'])} sent straight to Doc Creation (90%+ match)."
+                if body.get("_auto_docgen_failed"):
+                    msg += f" {len(body['_auto_docgen_failed'])} high-match job(s) stayed at Draft — doc generation failed, retry from Staged Matches."
+                st.success(msg)
                 st.session_state.pending_jobs = [j for j in st.session_state.pending_jobs if j not in to_export]
                 st.rerun()
             else:

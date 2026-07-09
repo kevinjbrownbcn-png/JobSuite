@@ -58,6 +58,10 @@ MATCH_EDITABLE_FIELDS = [
 # the user already rejected minutes/hours ago.
 REPOST_THRESHOLD_DAYS = 30
 
+# Jobs exported from the Audit page at or above this match score skip the manual
+# "Send to Prep" click and go straight to doc generation.
+AUTO_DOCGEN_THRESHOLD = 90
+
 _MONTH_MAP = {m: i + 1 for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 )}
@@ -245,13 +249,14 @@ def list_matches(conn, query):
     return 200, [_match_row_to_json(r) for r in rows]
 
 
-def create_matches(conn, body):
+def create_matches(conn, body, config):
     jobs = body.get("jobs")
     if not isinstance(jobs, list) or not jobs:
         return _json_error("Request body must include a non-empty 'jobs' array.")
 
     now = _now()
     inserted = []
+    high_score_ids = []
     for job in jobs:
         title = (job.get("job_title") or "").strip()
         company = (job.get("company") or "").strip()
@@ -273,13 +278,39 @@ def create_matches(conn, body):
                 "Draft", now, now,
             ),
         )
-        inserted.append(cur.lastrowid)
+        match_id = cur.lastrowid
+        inserted.append(match_id)
+
+        try:
+            score = float(job.get("match_score"))
+        except (TypeError, ValueError):
+            score = None
+        if score is not None and score >= AUTO_DOCGEN_THRESHOLD:
+            high_score_ids.append(match_id)
 
     if not inserted:
         return _json_error("No valid jobs in payload (job_title and company are required).")
 
     conn.commit()
-    return 201, {"inserted_ids": inserted, "count": len(inserted)}
+
+    # Skip the manual "Send to Prep" click for high-confidence matches — reuses
+    # update_match's own "New" transition so doc generation, the Processed/Draft
+    # outcome, and retry semantics on failure are identical to clicking the button
+    # by hand (a failed webhook just leaves the row at Draft, same as always).
+    auto_sent, auto_failed = [], []
+    for match_id in high_score_ids:
+        status, resp = update_match(conn, match_id, {"status": "New"}, config)
+        if status == 200:
+            auto_sent.append(match_id)
+        else:
+            auto_failed.append({"id": match_id, "error": resp.get("error")})
+
+    response = {"inserted_ids": inserted, "count": len(inserted)}
+    if auto_sent:
+        response["_auto_docgen_sent"] = auto_sent
+    if auto_failed:
+        response["_auto_docgen_failed"] = auto_failed
+    return 201, response
 
 
 def update_match(conn, match_id, body, config):
@@ -565,7 +596,7 @@ def dispatch(method, path, query, body, config):
             if method == "GET" and resource_id is None:
                 return list_matches(conn, query)
             if method == "POST" and resource_id is None:
-                return create_matches(conn, body)
+                return create_matches(conn, body, config)
             if method == "PATCH" and resource_id is not None:
                 return update_match(conn, resource_id, body, config)
             if method == "DELETE" and resource_id is not None:

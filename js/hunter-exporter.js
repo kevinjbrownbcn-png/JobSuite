@@ -1,4 +1,9 @@
-import { updateSelectedCounter } from './hunter-ui.js';
+import { updateSelectedCounter, renderJobCards } from './hunter-ui.js';
+
+function jobSignature(job) {
+    if (!job || !job.job_title || !job.company) return null;
+    return `${job.job_title.toLowerCase().trim()}_${job.company.toLowerCase().trim()}`;
+}
 
 export async function exportJobsToTracker(targetJobs = null) {
     let payload = [];
@@ -31,27 +36,32 @@ export async function exportJobsToTracker(targetJobs = null) {
             body: JSON.stringify({ jobs: payload })
         });
 
+        const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(err.error || `Local API rejected payload with status code: ${response.status}`);
+            throw new Error(result.error || `Local API rejected payload with status code: ${response.status}`);
         }
 
-        if (!targetJobs) {
-            document.querySelectorAll('.job-card-checkbox:checked').forEach(cb => {
-                const card = cb.closest('.job-card');
-                if (card) card.remove();
-            });
-
-            const remainingCards = document.querySelectorAll('.job-card');
-            if (remainingCards.length === 0) {
-                document.getElementById('results-container').classList.add('hidden');
-                document.getElementById('bulk-controls-panel').classList.add('hidden');
-                document.getElementById('empty-state').classList.remove('hidden');
-            }
-        }
+        // Drop exported jobs out of the accumulated list (matched by title+company,
+        // same identity key used everywhere else) and re-render what's left — this is
+        // what makes the accumulated Manual Audit list not resurrect already-exported
+        // postings the next time something new gets appended to it.
+        const exportedSignatures = new Set(payload.map(jobSignature).filter(Boolean));
+        const remaining = (window.currentJobsList || []).filter(job => {
+            const sig = jobSignature(job);
+            return sig === null || !exportedSignatures.has(sig);
+        });
+        renderJobCards(remaining);
 
         updateSelectedCounter();
-        window.showAlert('Export Succeeded', `Staged ${payload.length} role(s) — check the Staged Matches tab.`, 'success');
+
+        let message = `Staged ${payload.length} role(s) — check the Staged Matches tab.`;
+        if (result._auto_docgen_sent?.length) {
+            message += ` ${result._auto_docgen_sent.length} sent straight to Doc Creation (90%+ match).`;
+        }
+        if (result._auto_docgen_failed?.length) {
+            message += ` ${result._auto_docgen_failed.length} high-match job(s) stayed at Draft — doc generation failed, retry from Staged Matches.`;
+        }
+        window.showAlert('Export Succeeded', message, 'success');
 
     } catch (err) {
         console.error("Transmission Error:", err);

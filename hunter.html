@@ -49,13 +49,14 @@
 
     <script type="module">
         import { loadParamState } from './js/hunter-config.js';
-        import { renderJobCards, updateSelectedCounter, addCustomRoleOption, toggleSelectAll } from './js/hunter-ui.js';
+        import { renderJobCards, appendJobCards, updateSelectedCounter, addCustomRoleOption, toggleSelectAll } from './js/hunter-ui.js';
         import { scanWebForJobs } from './js/hunter-scanner.js';
         import { exportJobsToTracker } from './js/hunter-exporter.js';
         import { analyzeCareersHub } from './js/hunter-hub.js';
         import { renderStagedMatchesTable } from './js/hunter-staged.js';
 
         window.renderJobCards = renderJobCards;
+        window.appendJobCards = appendJobCards;
         window.updateSelectedCounter = updateSelectedCounter;
         window.renderStagedMatchesTable = renderStagedMatchesTable;
         window.analyzeCareersHub = analyzeCareersHub;

@@ -41,7 +41,7 @@ export async function analyzeManualURL() {
         singleJobArray[0].applied_through = document.getElementById('direct-analysis-applied-through')?.value.trim() || undefined;
         singleJobArray[0].posting_source = getPostingSourceValue('direct-analysis-posting-source') || undefined;
 
-        window.renderJobCards(singleJobArray);
+        window.appendJobCards(singleJobArray);
         urlInputElement.value = '';
 
         if (loadingState) loadingState.classList.add('hidden');
@@ -117,7 +117,7 @@ export async function analyzeManualText() {
         singleJobArray[0].applied_through = document.getElementById('manual-text-applied-through')?.value.trim() || undefined;
         singleJobArray[0].posting_source = getPostingSourceValue('manual-text-posting-source') || undefined;
 
-        window.renderJobCards(singleJobArray);
+        window.appendJobCards(singleJobArray);
 
         titleEl.value = '';
         companyEl.value = '';

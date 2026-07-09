@@ -122,6 +122,25 @@ async function checkCardUrl(pillEl, url) {
     }
 }
 
+// Merges newly-audited jobs into whatever's already showing (used by the Manual Audit
+// panels, which should stack up across multiple audits instead of replacing each other —
+// unlike the Web Scanner, which always starts a fresh list via renderJobCards directly).
+// Dedupes by title+company against what's already there so re-auditing the same posting
+// doesn't produce a second card.
+export function appendJobCards(newJobs) {
+    const existing = Array.isArray(window.currentJobsList) ? window.currentJobsList : [];
+    const existingSignatures = new Set(
+        existing
+            .filter(j => j.job_title && j.company)
+            .map(j => `${j.job_title.toLowerCase().trim()}_${j.company.toLowerCase().trim()}`)
+    );
+    const toAdd = newJobs.filter(job => {
+        if (!job.job_title || !job.company) return true;
+        return !existingSignatures.has(`${job.job_title.toLowerCase().trim()}_${job.company.toLowerCase().trim()}`);
+    });
+    renderJobCards([...existing, ...toAdd]);
+}
+
 export function renderJobCards(jobs) {
     const listContainer = document.getElementById('jobs-list');
     if (!listContainer) return;

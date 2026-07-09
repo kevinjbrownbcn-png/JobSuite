@@ -110,10 +110,9 @@ function processDiscoveredJobs(rawJobsArray, extraFields = {}) {
         };
     });
 
-    // 1. Commit state back to application global memory arrays cache
-    window.currentJobsList = normalizedJobs; 
-    
-    // 2. Force DOM wrapper visibility panels to expand
+    // 1. Force DOM wrapper visibility panels to expand (window.currentJobsList itself
+    // gets set by appendJobCards below, merged with whatever's already accumulated —
+    // it must NOT be overwritten here first, or prior audits would be wiped).
     const resultsContainer = document.getElementById('results-container');
     const emptyState = document.getElementById('empty-state');
     const bulkBar = document.getElementById('bulk-controls-panel');
@@ -124,11 +123,12 @@ function processDiscoveredJobs(rawJobsArray, extraFields = {}) {
     if (emptyState) emptyState.classList.add('hidden');
     if (resultsCount) resultsCount.textContent = `${normalizedJobs.length} Roles Discovered`;
 
-    // 3. Fire layout engine
-    if (typeof window.renderJobCards === 'function') {
+    // 2. Fire layout engine — appended (not replaced) so hub results stack alongside
+    // any other manual audits already on screen, matching the Verbatim/URL panels.
+    if (typeof window.appendJobCards === 'function') {
         try {
             console.log("🎮 Rendering saturated array to UI. Object footprint map:", normalizedJobs[0]);
-            window.renderJobCards(normalizedJobs);
+            window.appendJobCards(normalizedJobs);
         } catch (renderError) {
             console.error("❌ uiManager processing fault:", renderError);
             window.showAlert('Render Fault', `UI engine failed to compile layout: ${renderError.message}`, 'error');
