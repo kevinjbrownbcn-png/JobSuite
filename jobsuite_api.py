@@ -257,6 +257,7 @@ def create_matches(conn, body, config):
     now = _now()
     inserted = []
     high_score_ids = []
+    discard_ids = []
     for job in jobs:
         title = (job.get("job_title") or "").strip()
         company = (job.get("company") or "").strip()
@@ -280,6 +281,13 @@ def create_matches(conn, body, config):
         )
         match_id = cur.lastrowid
         inserted.append(match_id)
+
+        # A job flagged for immediate discard (e.g. dead-link postings caught while
+        # scanning) skips auto-docgen entirely, even at a high match score — the user
+        # has already decided against it, it's just being kept on file for reference.
+        if job.get("_discard"):
+            discard_ids.append(match_id)
+            continue
 
         try:
             score = float(job.get("match_score"))
@@ -305,11 +313,26 @@ def create_matches(conn, body, config):
         else:
             auto_failed.append({"id": match_id, "error": resp.get("error")})
 
+    # Same idea, reusing update_match's own "Discarded" transition — it always
+    # persists the Discarded status regardless of Drive cleanup outcome (there's
+    # nothing to clean up yet for a job that was never sent to prep), so this never
+    # fails the way the auto-docgen path above can.
+    auto_discarded, discard_warnings = [], []
+    for match_id in discard_ids:
+        _, resp = update_match(conn, match_id, {"status": "Discarded"}, config)
+        auto_discarded.append(match_id)
+        if resp.get("_discard_warning"):
+            discard_warnings.append({"id": match_id, "warning": resp["_discard_warning"]})
+
     response = {"inserted_ids": inserted, "count": len(inserted)}
     if auto_sent:
         response["_auto_docgen_sent"] = auto_sent
     if auto_failed:
         response["_auto_docgen_failed"] = auto_failed
+    if auto_discarded:
+        response["_auto_discarded"] = auto_discarded
+    if discard_warnings:
+        response["_discard_warnings"] = discard_warnings
     return 201, response
 
 

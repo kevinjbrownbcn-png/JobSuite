@@ -20,6 +20,18 @@ const CONFIG = {
         'Radio Silence'
     ],
 
+    // Statuses that don't count as "the company responded" for the Response Rate KPI —
+    // Sent/Received are pre-response states, Radio Silence is an explicit no-response.
+    NO_RESPONSE_STATUSES: ['Application Sent', 'Application Received', 'Radio Silence'],
+
+    // Rejection Rate KPI — the two explicit "this one's over, and not in your favor" statuses.
+    REJECTED_STATUSES: ['Application Declined', 'Not moving forward after interview'],
+
+    // Active Pipeline KPI — everything NOT in this set still has some action pending
+    // (a reply, a next round, a decision). Offer Accepted is a terminal *good* outcome,
+    // same bucket as the terminal bad ones for "nothing left to track" purposes.
+    TERMINAL_STATUSES: ['Application Declined', 'Not moving forward after interview', 'Offer Accepted', 'Radio Silence'],
+
     // Sentiment-based coloring for the Status dropdown: blue/neutral early on, amber
     // while pending action, purple once interviewing, green for good outcomes, red for
     // rejections, gray for stale. Falls back to STATUS_COLOR_FALLBACK for anything else

@@ -4,6 +4,7 @@ Applications Viewer), reading/writing the same jobsuite.db via jobsuite_api dire
 
 import re
 from collections import Counter
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -20,7 +21,17 @@ config = load_config()
 ROLE_MAP = load_json_config("roles-config.json")
 
 INTERVIEW_KEYWORDS = ["interview", "screen", "assessment", "technical", "panel", "l0", "l1", "l2"]
+OFFER_KEYWORDS = ["offer", "hired", "accepted"]
 STALE_DAYS_THRESHOLD = 14
+# Statuses that don't count as "the company responded" for the Response Rate KPI —
+# Sent/Received are pre-response states, Radio Silence is an explicit no-response.
+NO_RESPONSE_STATUSES = ["Application Sent", "Application Received", "Radio Silence"]
+# Rejection Rate KPI — the two explicit "this one's over, and not in your favor" statuses.
+REJECTED_STATUSES = ["Application Declined", "Not moving forward after interview"]
+# Active Pipeline KPI — everything NOT in this set still has some action pending.
+# Offer Accepted is a terminal *good* outcome, same bucket as the terminal bad ones
+# for "nothing left to track" purposes.
+TERMINAL_STATUSES = ["Application Declined", "Not moving forward after interview", "Offer Accepted", "Radio Silence"]
 
 st.title("📊 Pipeline Analytics")
 
@@ -45,6 +56,12 @@ with tab_metrics:
     stale_count = 0
     response_days_sum = 0
     response_days_count = 0
+    responded_count = 0
+    offer_count = 0
+    rejected_count = 0
+    active_pipeline_count = 0
+    apps_7d_count = 0
+    apps_30d_count = 0
 
     for row in applications:
         status = (row.get("Status") or "Applied").strip()
@@ -73,20 +90,51 @@ with tab_metrics:
             response_days_sum += response_days
             response_days_count += 1
 
+        if status not in NO_RESPONSE_STATUSES:
+            responded_count += 1
+
+        if any(kw in status.lower() for kw in OFFER_KEYWORDS):
+            offer_count += 1
+        if status in REJECTED_STATUSES:
+            rejected_count += 1
+        if status not in TERMINAL_STATUSES:
+            active_pipeline_count += 1
+
+        applied_date = jobsuite_api._parse_date(row.get("Date Applied"))
+        if applied_date:
+            age = (date.today() - applied_date).days
+            if 0 <= age <= 7:
+                apps_7d_count += 1
+            if 0 <= age <= 30:
+                apps_30d_count += 1
+
     top_category = max(category_counts, key=category_counts.get) if category_counts else "—"
     interview_rate = round((interview_count / total) * 100) if total else 0
+    response_rate = round((responded_count / total) * 100) if total else 0
+    offer_rate = round((offer_count / total) * 100) if total else 0
+    rejection_rate = round((rejected_count / total) * 100) if total else 0
     avg_response = (
         jobsuite_api._format_duration_days(round(response_days_sum / response_days_count))
         if response_days_count else "—"
     )
 
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
-    k1.metric("Total Applications", total)
-    k2.metric("Active Interviews", interview_count)
-    k3.metric("Interview Rate", f"{interview_rate}%")
-    k4.metric("Stale Trackings (>14d)", stale_count)
-    k5.metric("Top Category", top_category)
-    k6.metric("Avg Response Time", avg_response)
+    r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+    r1c1.metric("Total Applications", total)
+    r1c2.metric("Active Interviews", interview_count)
+    r1c3.metric("Interview Rate", f"{interview_rate}%")
+    r1c4.metric("Response Rate", f"{response_rate}%")
+
+    r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+    r2c1.metric("Offer Rate", f"{offer_rate}%")
+    r2c2.metric("Rejection Rate", f"{rejection_rate}%")
+    r2c3.metric("Active Pipeline", active_pipeline_count)
+    r2c4.metric("Stale Trackings (>14d)", stale_count)
+
+    r3c1, r3c2, r3c3, r3c4 = st.columns(4)
+    r3c1.metric("Top Category", top_category)
+    r3c2.metric("Avg Response Time", avg_response)
+    r3c3.metric("Applications (Last 7 Days)", apps_7d_count)
+    r3c4.metric("Applications (Last 30 Days)", apps_30d_count)
 
     st.divider()
     c1, c2, c3 = st.columns(3)

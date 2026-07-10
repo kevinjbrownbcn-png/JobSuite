@@ -212,13 +212,23 @@ export function renderJobCards(jobs) {
                             : '<span></span>'}
                         ${job._reposted ? '<span class="link-status-pill link-status-repost" title="Previously discarded, reappeared in this scan">↻ Reposted</span>' : ''}
                     </div>
-                    <button
-                        class="single-export-btn"
-                        style="background: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
-                        onclick="window.exportJobsToTracker(window.currentJobsList[${index}])"
-                    >
-                        Sync to Tracker →
-                    </button>
+                    <div style="display: flex; gap: 6px;">
+                        <button
+                            class="single-discard-btn"
+                            style="background: none; color: #ef4444; border: 1px solid #ef4444; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
+                            title="Store on the tracker for reference without acting on it — e.g. a dead/expired listing"
+                            onclick="window.discardJobPosting(window.currentJobsList[${index}])"
+                        >
+                            Discard
+                        </button>
+                        <button
+                            class="single-export-btn"
+                            style="background: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
+                            onclick="window.exportJobsToTracker(window.currentJobsList[${index}])"
+                        >
+                            Sync to Tracker →
+                        </button>
+                    </div>
                 </div>
             </div>
         `;

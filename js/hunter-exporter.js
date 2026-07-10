@@ -54,14 +54,24 @@ export async function exportJobsToTracker(targetJobs = null) {
 
         updateSelectedCounter();
 
-        let message = `Staged ${payload.length} role(s) — check the Staged Matches tab.`;
-        if (result._auto_docgen_sent?.length) {
-            message += ` ${result._auto_docgen_sent.length} sent straight to Doc Creation (90%+ match).`;
+        if (result._auto_discarded?.length) {
+            const job = payload[0] || {};
+            const label = job.job_title && job.company ? `"${job.job_title}" at ${job.company}` : 'Posting';
+            let message = `${label} discarded — kept on the tracker for reference, no action needed.`;
+            if (result._discard_warnings?.length) {
+                message += ` (Drive cleanup skipped: ${result._discard_warnings[0].warning})`;
+            }
+            window.showAlert('Discarded', message, 'info');
+        } else {
+            let message = `Staged ${payload.length} role(s) — check the Staged Matches tab.`;
+            if (result._auto_docgen_sent?.length) {
+                message += ` ${result._auto_docgen_sent.length} sent straight to Doc Creation (90%+ match).`;
+            }
+            if (result._auto_docgen_failed?.length) {
+                message += ` ${result._auto_docgen_failed.length} high-match job(s) stayed at Draft — doc generation failed, retry from Staged Matches.`;
+            }
+            window.showAlert('Export Succeeded', message, 'success');
         }
-        if (result._auto_docgen_failed?.length) {
-            message += ` ${result._auto_docgen_failed.length} high-match job(s) stayed at Draft — doc generation failed, retry from Staged Matches.`;
-        }
-        window.showAlert('Export Succeeded', message, 'success');
 
     } catch (err) {
         console.error("Transmission Error:", err);
@@ -74,4 +84,15 @@ export async function exportJobsToTracker(targetJobs = null) {
     }
 }
 
+// Discard straight from a scanner card — e.g. a dead-link posting (410/404). Still
+// created on the tracker for reference via the same /api/matches insert as a normal
+// export, just immediately marked Discarded so it never shows up needing action.
+export async function discardJobPosting(job) {
+    if (!job) return;
+    const label = job.job_title && job.company ? `"${job.job_title}" at ${job.company}` : 'this posting';
+    if (!window.confirm(`Discard ${label}? It'll be stored on the tracker for reference but won't need any action.`)) return;
+    await exportJobsToTracker({ ...job, _discard: true });
+}
+
 window.exportJobsToTracker = exportJobsToTracker;
+window.discardJobPosting = discardJobPosting;

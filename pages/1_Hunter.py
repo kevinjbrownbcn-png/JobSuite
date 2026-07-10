@@ -284,7 +284,7 @@ else:
     to_export = []
     for i, job in enumerate(st.session_state.pending_jobs):
         with st.container(border=True):
-            c1, c2 = st.columns([5, 1])
+            c1, c2, c3 = st.columns([5, 1, 1])
             with c1:
                 score = job.get("match_score", 0)
                 st.markdown(
@@ -301,6 +301,26 @@ else:
             with c2:
                 if st.checkbox("Export", key=f"select_{i}", value=True):
                     to_export.append(job)
+            with c3:
+                # Store on the tracker for reference without acting on it — e.g. a
+                # dead/expired listing (410/404) — mirrors the desktop's per-card
+                # Discard button, reusing create_matches' same _discard flag.
+                if st.button("Discard", key=f"discard_{i}"):
+                    conn = jobsuite_db.get_connection()
+                    try:
+                        status, body = jobsuite_api.create_matches(conn, {"jobs": [{**job, "_discard": True}]}, config)
+                    finally:
+                        conn.close()
+                    if status == 201:
+                        label = f'"{job.get("job_title", "Untitled")}" at {job.get("company", "Unknown")}'
+                        msg = f"{label} discarded — kept on the tracker for reference, no action needed."
+                        if body.get("_discard_warnings"):
+                            msg += f" (Drive cleanup skipped: {body['_discard_warnings'][0]['warning']})"
+                        st.info(msg)
+                        st.session_state.pending_jobs = [j for j in st.session_state.pending_jobs if j is not job]
+                        st.rerun()
+                    else:
+                        st.error(body.get("error", "Discard failed."))
 
     b1, b2 = st.columns(2)
     with b1:
