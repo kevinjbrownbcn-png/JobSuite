@@ -56,13 +56,21 @@ def _post_json(url, payload, timeout=DEFAULT_TIMEOUT):
 
 
 def fire_docgen(webhook_url, match_row):
-    """Pipeline 01: New -> Processed. Generates the tailored CV/cover letter."""
+    """Pipeline 01: New -> Processed. Generates the tailored CV/cover letter.
+
+    `notes` carries user-written instructions for this specific application (e.g.
+    "posting says on-site/hybrid — request remote consideration in the cover letter")
+    for the scenario's drafting step to take into account. It's inert until Pipeline
+    01's own prompt is updated to read and act on it — this just gets it there.
+    """
     payload = {
         "profile": match_row.get("profile"),
         "job_title": match_row.get("job_title"),
         "company": match_row.get("company"),
         "job_url": match_row.get("job_url"),
         "job_description": match_row.get("job_description"),
+        "notes": match_row.get("notes"),
+        "is_workday": bool(match_row.get("is_workday")),
     }
     return _post_json(webhook_url, payload)
 

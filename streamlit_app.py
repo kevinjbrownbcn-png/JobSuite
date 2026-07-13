@@ -14,8 +14,10 @@ import streamlit as st
 
 import jobsuite_db
 from jobsuite_config import load_config
+from streamlit_common import apply_theme
 
 st.set_page_config(page_title="JobSuite — Control Center", page_icon="💼", layout="wide")
+apply_theme()
 
 jobsuite_db.init_db()
 config = load_config()

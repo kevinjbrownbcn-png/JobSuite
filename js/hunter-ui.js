@@ -14,10 +14,15 @@ function escapeHTML(str) {
 // Continuous red (0%) -> yellow (50%) -> green (100%) scale, matching the color-scale
 // conditional formatting the match scores used to have in the spreadsheet.
 function scoreToColor(score) {
-    if (score === null || score === undefined || score === '' || isNaN(score)) return '#64748b';
+    if (score === null || score === undefined || score === '' || isNaN(score)) return 'var(--text-muted)';
     const pct = Math.max(0, Math.min(100, Number(score))) / 100;
     return `hsl(${pct * 120}, 70%, 45%)`;
 }
+
+// Workday-hosted career sites virtually always run on this domain, regardless of the
+// company's own branding — good enough as an auto-detect default, with the card's
+// checkbox left editable for the cases it misses (custom domains, etc).
+const WORKDAY_URL_PATTERN = /myworkdayjobs\.com/i;
 
 export function updateSelectedCounter() {
     const totalCards = document.querySelectorAll('.job-card').length;
@@ -172,6 +177,13 @@ export function renderJobCards(jobs) {
 
         renderedCount++;
 
+        // Auto-detect once per job (mutating it in place) so a re-render — e.g. from
+        // appendJobCards stacking another audit on top — doesn't clobber a manual
+        // toggle with a fresh auto-detect result.
+        if (job.is_workday === undefined) {
+            job.is_workday = WORKDAY_URL_PATTERN.test(job.link || job.job_url || '');
+        }
+
         const card = document.createElement('div');
         card.className = "job-card";
         card.dataset.jobData = JSON.stringify(job);
@@ -181,7 +193,7 @@ export function renderJobCards(jobs) {
 
         const skillGapsHTML = Array.isArray(job.skills_gaps) && job.skills_gaps.length > 0
             ? job.skills_gaps.map(g => `<span class="badge-gap">${escapeHTML(g)}</span>`).join('')
-            : `<span style="color: #10b981; font-size: 12px; font-weight: bold;">✓ Perfect Toolkit Alignment</span>`;
+            : `<span style="color: var(--success); font-size: 12px; font-weight: bold;">✓ Perfect Toolkit Alignment</span>`;
 
         const safeLink = job.link && job.link.startsWith('http') ? job.link : null;
 
@@ -193,7 +205,7 @@ export function renderJobCards(jobs) {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
                     <div>
                         <h4 class="card-title">${escapeHTML(job.job_title) || 'Inferred Position'}</h4>
-                        <p class="card-subtitle">${escapeHTML(job.company) || 'Unknown Studio'} — <span style="color: #94a3b8;">${escapeHTML(job.location) || 'Manual Text Audit'}</span></p>
+                        <p class="card-subtitle">${escapeHTML(job.company) || 'Unknown Studio'} — <span style="color: var(--text-muted);">${escapeHTML(job.location) || 'Manual Text Audit'}</span></p>
                     </div>
                     <div class="card-score-badge" style="background-color: ${scoreColor};">${job.match_score || 0}% Match</div>
                 </div>
@@ -205,17 +217,26 @@ export function renderJobCards(jobs) {
                     <div style="display: flex; flex-wrap: wrap; gap: 6px;">${skillGapsHTML}</div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; border-top: 1px solid #334155; padding-top: 8px;">
-                    <div style="display: flex; align-items: center; gap: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
                         ${safeLink
                             ? `<a href="${escapeHTML(safeLink)}" target="_blank" class="card-link-anchor" title="${escapeHTML(safeLink)}" style="margin: 0;">Open Original Job Website ↗</a><span class="link-status-pill link-status-checking">⏳</span>`
                             : '<span></span>'}
                         ${job._reposted ? '<span class="link-status-pill link-status-repost" title="Previously discarded, reappeared in this scan">↻ Reposted</span>' : ''}
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); cursor: pointer; user-select: none;" title="Tailor the generated CV for Workday's ATS parser. Auto-detected from the job URL — override if it's wrong.">
+                            <input
+                                type="checkbox"
+                                class="workday-ats-checkbox"
+                                ${job.is_workday ? 'checked' : ''}
+                                onchange="window.currentJobsList[${index}].is_workday = this.checked;"
+                            >
+                            Workday ATS
+                        </label>
                     </div>
                     <div style="display: flex; gap: 6px;">
                         <button
                             class="single-discard-btn"
-                            style="background: none; color: #ef4444; border: 1px solid #ef4444; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
+                            style="background: none; color: var(--error); border: 1px solid var(--error); padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
                             title="Store on the tracker for reference without acting on it — e.g. a dead/expired listing"
                             onclick="window.discardJobPosting(window.currentJobsList[${index}])"
                         >
@@ -223,7 +244,7 @@ export function renderJobCards(jobs) {
                         </button>
                         <button
                             class="single-export-btn"
-                            style="background: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
+                            style="background: var(--panel); color: #38bdf8; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;"
                             onclick="window.exportJobsToTracker(window.currentJobsList[${index}])"
                         >
                             Sync to Tracker →

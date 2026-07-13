@@ -15,20 +15,20 @@ function escapeHTML(str) {
 // Continuous red (0%) -> yellow (50%) -> green (100%) scale, matching the color-scale
 // conditional formatting the match scores used to have in the spreadsheet.
 function scoreToColor(score) {
-    if (score === null || score === undefined || score === '' || isNaN(score)) return '#64748b';
+    if (score === null || score === undefined || score === '' || isNaN(score)) return 'var(--text-muted)';
     const pct = Math.max(0, Math.min(100, Number(score))) / 100;
     return `hsl(${pct * 120}, 70%, 45%)`;
 }
 
 const STATUS_LABELS = {
-    'Draft':               { text: 'Draft',           color: '#64748b' },
-    'New':                 { text: 'Queued for Prep',  color: '#eab308' },
+    'Draft':               { text: 'Draft',           color: 'var(--text-muted)' },
+    'New':                 { text: 'Queued for Prep',  color: 'var(--accent-amber)' },
     'Processed':           { text: 'Docs Ready',       color: '#38bdf8' },
-    'Applied':             { text: 'Applied',          color: '#a855f7' },
-    'Migrated to Tracker': { text: '✓ In Tracker', color: '#10b981' },
-    'Discarded':           { text: 'Discarding…',     color: '#f97316' },
-    'Purged':              { text: 'Discarded',        color: '#6b7280' },
-    'N/A':                 { text: 'N/A',               color: '#6b7280' }
+    'Applied':             { text: 'Applied',          color: 'var(--accent-purple)' },
+    'Migrated to Tracker': { text: '✓ In Tracker', color: 'var(--success)' },
+    'Discarded':           { text: 'Discarding…',     color: 'var(--warning)' },
+    'Purged':              { text: 'Discarded',        color: 'var(--text-muted)' },
+    'N/A':                 { text: 'N/A',               color: 'var(--text-muted)' }
 };
 
 async function patchMatch(id, statusValue, loadingMessage) {
@@ -81,29 +81,42 @@ function toggleDescriptionEditor(match, rowEl) {
 
     const td = document.createElement('td');
     td.colSpan = 4;
-    td.style.cssText = 'padding: 12px; background: #0d1117;';
+    td.style.cssText = 'padding: 12px; background: var(--nav-underlay);';
+
+    const descLabel = document.createElement('div');
+    descLabel.textContent = 'Job Description';
+    descLabel.style.cssText = 'font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px;';
 
     const textarea = document.createElement('textarea');
     textarea.value = match.job_description || '';
     textarea.placeholder = 'No job description on file.';
-    textarea.style.cssText = 'width:100%; min-height:140px; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:8px; font-size:12px; font-family:inherit; box-sizing:border-box; resize:vertical;';
+    textarea.style.cssText = 'width:100%; min-height:140px; background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px; font-family:inherit; box-sizing:border-box; resize:vertical;';
+
+    const notesLabel = document.createElement('div');
+    notesLabel.textContent = 'Special Instructions (considered when generating docs)';
+    notesLabel.style.cssText = 'font-size:11px; font-weight:600; color:var(--text-muted); margin:10px 0 4px;';
+
+    const notesTextarea = document.createElement('textarea');
+    notesTextarea.value = match.notes || '';
+    notesTextarea.placeholder = 'e.g. "Posting says on-site/hybrid — request remote consideration in the cover letter."';
+    notesTextarea.style.cssText = 'width:100%; min-height:60px; background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px; font-family:inherit; box-sizing:border-box; resize:vertical;';
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'margin-top:8px; display:flex; gap:8px;';
 
     const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Save Description';
+    saveBtn.textContent = 'Save';
     saveBtn.style.cssText = 'background:#0d9488;color:#fff;border:none;padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;';
     saveBtn.onclick = async () => {
         try {
             const response = await fetch(`/api/matches/${match.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ job_description: textarea.value })
+                body: JSON.stringify({ job_description: textarea.value, notes: notesTextarea.value })
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-            window.showAlert('Saved', 'Job description updated.', 'success');
+            window.showAlert('Saved', 'Description and instructions updated.', 'success');
             await renderStagedMatchesTable();
         } catch (err) {
             window.showAlert('Save Failed', err.message, 'error');
@@ -112,11 +125,11 @@ function toggleDescriptionEditor(match, rowEl) {
 
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.cssText = 'background:none;color:#94a3b8;border:1px solid #334155;padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;';
+    cancelBtn.style.cssText = 'background:none;color:var(--text-muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;';
     cancelBtn.onclick = () => editorRow.remove();
 
     btnRow.append(saveBtn, cancelBtn);
-    td.append(textarea, btnRow);
+    td.append(descLabel, textarea, notesLabel, notesTextarea, btnRow);
     editorRow.appendChild(td);
     rowEl.after(editorRow);
 }
@@ -147,11 +160,11 @@ export async function renderStagedMatchesTable() {
 
     matches.forEach(match => {
         const row = document.createElement('tr');
-        const statusInfo = STATUS_LABELS[match.status] || { text: match.status, color: '#64748b' };
+        const statusInfo = STATUS_LABELS[match.status] || { text: match.status, color: 'var(--text-muted)' };
         const safeLink = match.job_url && match.job_url.startsWith('http') ? match.job_url : null;
 
         const tdTitle = document.createElement('td');
-        tdTitle.innerHTML = `<span style="font-weight:600; color:#f8fafc;">${escapeHTML(match.job_title)}</span><br><span style="color:#94a3b8; font-size:11px;">${escapeHTML(match.company)}</span>`;
+        tdTitle.innerHTML = `<span style="font-weight:600; color:var(--text-main);">${escapeHTML(match.job_title)}</span><br><span style="color:var(--text-muted); font-size:11px;">${escapeHTML(match.company)}</span>`;
 
         const tdScore = document.createElement('td');
         tdScore.style.textAlign = 'center';
@@ -160,7 +173,7 @@ export async function renderStagedMatchesTable() {
         // Same visual treatment as the Action column's buttons: dark fill, colored
         // text, matching colored border — texts/colors themselves come from STATUS_LABELS.
         const tdStatus = document.createElement('td');
-        tdStatus.innerHTML = `<span style="display:inline-block; background:#1e293b; color:${statusInfo.color}; border:1px solid ${statusInfo.color}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600;">${escapeHTML(statusInfo.text)}</span>`;
+        tdStatus.innerHTML = `<span style="display:inline-block; background:var(--panel); color:${statusInfo.color}; border:1px solid ${statusInfo.color}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600;">${escapeHTML(statusInfo.text)}</span>`;
 
         const tdAction = document.createElement('td');
         tdAction.style.textAlign = 'right';
@@ -175,20 +188,29 @@ export async function renderStagedMatchesTable() {
         }
 
         const descBtn = document.createElement('button');
-        descBtn.style.cssText = 'background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
-        descBtn.textContent = 'Edit Description';
+        descBtn.style.cssText = 'background:var(--panel);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+        descBtn.textContent = 'Edit Details';
         descBtn.onclick = () => toggleDescriptionEditor(match, row);
         tdAction.appendChild(descBtn);
 
         if (match.status === 'Draft' || match.status === 'New') {
             const btn = document.createElement('button');
-            btn.style.cssText = 'background:#1e293b;color:#eab308;border:1px solid #eab308;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+            btn.style.cssText = 'background:var(--panel);color:var(--accent-amber);border:1px solid var(--accent-amber);padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
             btn.textContent = match.status === 'New' ? 'Retry: Send to Prep' : 'Send to Prep';
             btn.onclick = () => patchMatch(match.id, 'New', 'Requesting CV/cover letter generation…');
             tdAction.appendChild(btn);
         } else if (match.status === 'Processed') {
+            const regenBtn = document.createElement('button');
+            regenBtn.style.cssText = 'background:var(--panel);color:#38bdf8;border:1px solid #38bdf8;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+            regenBtn.textContent = 'Regenerate Docs';
+            regenBtn.onclick = () => {
+                if (!window.confirm('Regenerate the CV/cover letter? This creates a new set of docs alongside the existing ones — it does not overwrite them.')) return;
+                patchMatch(match.id, 'New', 'Re-pushing content to Docs…');
+            };
+            tdAction.appendChild(regenBtn);
+
             const btn = document.createElement('button');
-            btn.style.cssText = 'background:#1e293b;color:#a855f7;border:1px solid #a855f7;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
+            btn.style.cssText = 'background:var(--panel);color:var(--accent-purple);border:1px solid var(--accent-purple);padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;margin-right:6px;';
             btn.textContent = 'Mark as Applied';
             btn.onclick = () => patchMatch(match.id, 'Applied', 'Recording application…');
             tdAction.appendChild(btn);
@@ -196,7 +218,7 @@ export async function renderStagedMatchesTable() {
 
         if (!['Migrated to Tracker', 'Purged'].includes(match.status)) {
             const discardBtn = document.createElement('button');
-            discardBtn.style.cssText = 'background:none;color:#ef4444;border:1px solid #ef4444;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;';
+            discardBtn.style.cssText = 'background:none;color:var(--error);border:1px solid var(--error);padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;';
             discardBtn.textContent = match.status === 'Discarded' ? 'Retry Cleanup' : 'Discard';
             discardBtn.onclick = () => discardMatch(match.id);
             tdAction.appendChild(discardBtn);

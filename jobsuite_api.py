@@ -50,7 +50,7 @@ APPLICATIONS_HEADER_MAP = {
 APPLICATION_EDITABLE_FIELDS = list(APPLICATIONS_HEADER_MAP.keys())
 MATCH_EDITABLE_FIELDS = [
     "profile", "job_url", "job_description", "summary", "match_score", "notes",
-    "applied_through", "posting_source",
+    "applied_through", "posting_source", "is_workday",
 ]
 
 # A Purged posting only resurfaces in scan results after this many days — long enough
@@ -269,13 +269,13 @@ def create_matches(conn, body, config):
             """INSERT INTO matches
                (profile, job_title, company, location, job_url, job_description, summary,
                 match_score, skills_gaps, preparation_material, notes, applied_through,
-                posting_source, status, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                posting_source, is_workday, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 job.get("profile"), title, company, job.get("location"),
                 job.get("link") or job.get("job_url"), job.get("description"), job.get("summary"),
                 job.get("match_score"), json.dumps(gaps), json.dumps(prep), job.get("notes"),
-                job.get("applied_through"), job.get("posting_source"),
+                job.get("applied_through"), job.get("posting_source"), bool(job.get("is_workday")),
                 "Draft", now, now,
             ),
         )

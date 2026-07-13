@@ -1,4 +1,18 @@
+// Chart.js bakes colors into the canvas at draw time, so its axis/legend text and grid
+// lines (UI chrome, not the data itself) need to read the current theme's tokens rather
+// than a fixed dark-mode hex. The data segment/bar colors below are deliberately left
+// untouched — those are the actual visualization output, not chrome.
+function chartChromeColors() {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+        text: styles.getPropertyValue('--text-main').trim() || '#c9d1d9',
+        grid: styles.getPropertyValue('--border').trim() || '#21262d',
+    };
+}
+
 function renderCharts(statusCounts, channelCounts, roleCounts) {
+    const { text: textColor, grid: gridColor } = chartChromeColors();
+
     // Clear out active layout structures
     if(AppState.charts.status) AppState.charts.status.destroy();
     if(AppState.charts.channel) AppState.charts.channel.destroy();
@@ -13,7 +27,7 @@ function renderCharts(statusCounts, channelCounts, roleCounts) {
             labels: Object.keys(statusCounts),
             datasets: [{ data: Object.values(statusCounts), backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#6b7280'], borderWidth: 0 }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#c9d1d9', boxWidth: 10, font: { size: 9 } } } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: textColor, boxWidth: 10, font: { size: 9 } } } } }
     });
 
     // 2. Top Channels Chart
@@ -24,9 +38,9 @@ function renderCharts(statusCounts, channelCounts, roleCounts) {
             labels: Object.keys(channelCounts),
             datasets: [{ data: Object.values(channelCounts), backgroundColor: '#3b82f6', borderRadius: 4 }]
         },
-        options: { 
+        options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { y: { ticks: { color: '#c9d1d9', stepSize: 1, font: { size: 9 } }, grid: { color: '#21262d' } }, x: { ticks: { color: '#c9d1d9', font: { size: 9 } }, grid: { display: false } } },
+            scales: { y: { ticks: { color: textColor, stepSize: 1, font: { size: 9 } }, grid: { color: gridColor } }, x: { ticks: { color: textColor, font: { size: 9 } }, grid: { display: false } } },
             plugins: { legend: { display: false } }
         }
     });
@@ -37,13 +51,13 @@ function renderCharts(statusCounts, channelCounts, roleCounts) {
         type: 'doughnut',
         data: {
             labels: Object.keys(roleCounts),
-            datasets: [{ 
-                data: Object.values(roleCounts), 
-                backgroundColor: ['#a855f7', '#ec4899', '#f43f5e', '#6366f1', '#06b6d4', '#4b5563'], 
-                borderWidth: 0 
+            datasets: [{
+                data: Object.values(roleCounts),
+                backgroundColor: ['#a855f7', '#ec4899', '#f43f5e', '#6366f1', '#06b6d4', '#4b5563'],
+                borderWidth: 0
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#c9d1d9', boxWidth: 10, font: { size: 9 } } } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: textColor, boxWidth: 10, font: { size: 9 } } } } }
     });
 }
 

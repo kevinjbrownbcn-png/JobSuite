@@ -75,6 +75,7 @@ def get_connection() -> sqlite3.Connection:
 MATCHES_MIGRATIONS = [
     ("applied_through", "TEXT"),
     ("posting_source", "TEXT"),
+    ("is_workday", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

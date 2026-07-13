@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script src="js/theme.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Job Hunter — JobSuite</title>
     <link rel="stylesheet" href="css/styles.css">
@@ -67,6 +68,7 @@
 
         window.onload = async function() {
             document.getElementById('footer-year').textContent = new Date().getFullYear();
+            window.JobSuiteTheme.bindThemeToggleButton(document.getElementById('theme-toggle-btn'));
             if (typeof loadParamState === 'function') {
                 try { await loadParamState(); } catch(e) { console.warn("Param state warm boot deferred:", e); }
             }
@@ -114,11 +116,14 @@
             </div>
         </div>
 
-        <nav>
-            <button onclick="window.switchTab('hunt')" id="tab-hunt" class="active">🔎 Web Job Scanner</button>
-            <button onclick="window.switchTab('manual')" id="tab-manual">🎯 Manual Audit</button>
-            <button onclick="window.switchTab('staged')" id="tab-staged">🗂️ Staged Matches</button>
-        </nav>
+        <div class="header-actions">
+            <nav>
+                <button onclick="window.switchTab('hunt')" id="tab-hunt" class="active">🔎 Web Job Scanner</button>
+                <button onclick="window.switchTab('manual')" id="tab-manual">🎯 Manual Audit</button>
+                <button onclick="window.switchTab('staged')" id="tab-staged">🗂️ Staged Matches</button>
+            </nav>
+            <button class="theme-toggle-btn" id="theme-toggle-btn"></button>
+        </div>
     </header>
 
     <main>
@@ -136,7 +141,7 @@
                                 </div>
                                 <div class="add-role-row">
                                     <input type="text" id="custom-role-input" placeholder="Add custom title..." onkeydown="if(event.key === 'Enter') window.addCustomRoleOption()" class="text-input" style="padding: 4px 8px; font-size: 11px;">
-                                    <button onclick="window.addCustomRoleOption()" class="text-input" style="width: auto; background-color: #1e293b; padding: 4px 10px; font-weight: bold; cursor: pointer;">+</button>
+                                    <button onclick="window.addCustomRoleOption()" class="text-input" style="width: auto; background-color: var(--panel); padding: 4px 10px; font-weight: bold; cursor: pointer;">+</button>
                                 </div>
                             </div>
                         </div>
@@ -229,14 +234,14 @@
                         </div>
                         <div class="input-group" style="margin-top: 8px;">
                             <label for="manual-text-posting-source" class="input-label">Posting Source</label>
-                            <select id="manual-text-posting-source" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                            <select id="manual-text-posting-source" class="text-input" style="height: 34px; padding: 4px 8px;">
                                 <!-- populated from hunter-profiles.json -->
                             </select>
                             <input type="text" id="manual-text-posting-source-other" placeholder="Enter source..." class="text-input hidden" style="margin-top: 6px;">
                         </div>
                         <div class="input-group" style="margin-top: 8px; margin-bottom: 8px;">
                             <label for="manual-profile" class="input-label">Alignment Context</label>
-                            <select id="manual-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                            <select id="manual-profile" class="text-input" style="height: 34px; padding: 4px 8px;">
                                 <!-- populated from hunter-profiles.json -->
                             </select>
                         </div>
@@ -255,7 +260,7 @@
 
                         <div class="input-group" style="margin-top: 14px;">
                             <label for="direct-analysis-profile" class="input-label">Alignment Context</label>
-                            <select id="direct-analysis-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                            <select id="direct-analysis-profile" class="text-input" style="height: 34px; padding: 4px 8px;">
                                 <!-- populated from hunter-profiles.json -->
                             </select>
                         </div>
@@ -269,7 +274,7 @@
                         </div>
                         <div class="input-group" style="margin-top: 8px;">
                             <label for="direct-analysis-posting-source" class="input-label">Posting Source</label>
-                            <select id="direct-analysis-posting-source" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                            <select id="direct-analysis-posting-source" class="text-input" style="height: 34px; padding: 4px 8px;">
                                 <!-- populated from hunter-profiles.json -->
                             </select>
                             <input type="text" id="direct-analysis-posting-source-other" placeholder="Enter source..." class="text-input hidden" style="margin-top: 6px;">
@@ -280,12 +285,12 @@
 
                 <div class="card-panel panel-hub" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
                     <div>
-                        <h2 class="panel-title" style="color: #c084fc;">🏢 Scan Corporate Careers Hub</h2>
+                        <h2 class="panel-title" style="color: var(--accent-purple);">🏢 Scan Corporate Careers Hub</h2>
                         <p class="panel-desc">Paste a corporate career board to automatically crawl, analyze, and grade all vacancies.</p>
 
                         <div class="input-group" style="margin-top: 14px;">
                             <label for="hub-analysis-profile" class="input-label">Alignment Context</label>
-                            <select id="hub-analysis-profile" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                            <select id="hub-analysis-profile" class="text-input" style="height: 34px; padding: 4px 8px;">
                                 <!-- populated from hunter-profiles.json -->
                             </select>
                         </div>
@@ -299,13 +304,13 @@
                         </div>
                         <div class="input-group" style="margin-top: 8px;">
                             <label for="hub-analysis-posting-source" class="input-label">Posting Source</label>
-                            <select id="hub-analysis-posting-source" class="text-input" style="height: 34px; padding: 4px 8px; background: #0f172a;">
+                            <select id="hub-analysis-posting-source" class="text-input" style="height: 34px; padding: 4px 8px;">
                                 <!-- populated from hunter-profiles.json -->
                             </select>
                             <input type="text" id="hub-analysis-posting-source-other" placeholder="Enter source..." class="text-input hidden" style="margin-top: 6px;">
                         </div>
                     </div>
-                    <button onclick="window.analyzeCareersHub()" class="btn-primary" style="background-color: #a855f7; margin-top: auto;">🔮 Batch Process Hub</button>
+                    <button onclick="window.analyzeCareersHub()" class="btn-primary" style="background-color: var(--accent-purple); margin-top: auto;">🔮 Batch Process Hub</button>
                 </div>
 
             </div>
@@ -313,10 +318,10 @@
 
         <div id="content-staged" class="tab-content-hidden space-y-6">
             <div class="card-panel" style="justify-content: flex-start; gap: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 14px;">
                     <div>
                         <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Staged Matches</h2>
-                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">AI-scored roles exported from the scanner. Send a match to prep to generate a tailored CV/cover letter, then mark it Applied once submitted to migrate it into the Pipeline Analytics tracker.</p>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">AI-scored roles exported from the scanner. Send a match to prep to generate a tailored CV/cover letter, then mark it Applied once submitted to migrate it into the Pipeline Analytics tracker.</p>
                     </div>
                     <button onclick="window.renderStagedMatchesTable()" class="btn-clear-history">Refresh</button>
                 </div>

@@ -2,23 +2,69 @@
 <html lang="en">
 	<head>
 		<meta charset="UTF-8">
+		<script src="js/theme.js"></script>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Pipeline Analytics — JobSuite</title>
 		<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 		<style>
-			body { background-color: #0d1117; color: #c9d1d9; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-			.card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; }
-			.accent-glow { border-top: 3px solid #10b981; }
-			.tab-active { color: #10b981; border-bottom: 2px solid #10b981; font-weight: 600; }
+			:root {
+				--bg:                   #0d1117;
+				--panel:                #161b22;
+				--nav-underlay:         #0b0f19;
+				--accent:               #2dd4bf;
+				--accent-hover:         #14b8a6;
+				--text-main:            #c9d1d9;
+				--text-muted:           #64748b;
+				--border:               #30363d;
+				--success:              #10b981;
+			}
+			:root[data-theme="light"] {
+				--bg:                   #f8fafc;
+				--panel:                #ffffff;
+				--nav-underlay:         #e2e8f0;
+				--accent:               #0d9488;
+				--accent-hover:         #0f766e;
+				--text-main:            #0f172a;
+				--text-muted:           #475569;
+				--border:               #cbd5e1;
+				--success:              #16a34a;
+			}
+
+			body { background-color: var(--bg); color: var(--text-main); font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+			.card { background-color: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+			.accent-glow { border-top: 3px solid var(--success); }
+			.tab-active { color: var(--success); border-bottom: 2px solid var(--success); font-weight: 600; }
 			.custom-scroll::-webkit-scrollbar { width: 4px; }
-			.custom-scroll::-webkit-scrollbar-track { background: #161b22; }
-			.custom-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+			.custom-scroll::-webkit-scrollbar-track { background: var(--panel); }
+			.custom-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 			th.sortable { cursor: pointer; user-select: none; }
-			th.sortable:hover { color: #10b981; }
-			.app-footer { background-color: #0f172a; border-top: 1px solid #1e293b; padding: 12px 24px; text-align: right; font-size: 12px; color: #64748b; flex-shrink: 0; }
-			.app-footer a { color: #2dd4bf; text-decoration: none; font-weight: 600; margin-left: 12px; transition: color 0.2s; }
-			.app-footer a:hover { color: #14b8a6; }
+			th.sortable:hover { color: var(--success); }
+			.app-footer { background-color: var(--nav-underlay); border-top: 1px solid var(--border); padding: 12px 24px; text-align: right; font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+			.app-footer a { color: var(--accent); text-decoration: none; font-weight: 600; margin-left: 12px; transition: color 0.2s; }
+			.app-footer a:hover { color: var(--accent-hover); }
+
+			.theme-toggle-btn {
+				background: none; border: 1px solid var(--border); color: var(--text-muted);
+				padding: 8px 14px; font-size: 12px; font-weight: 600; border-radius: 6px;
+				cursor: pointer; transition: all 0.2s; white-space: nowrap;
+			}
+			.theme-toggle-btn:hover { color: var(--text-main); border-color: var(--accent); }
+
+			/* Tailwind's utility classes are fixed-palette and don't know about our
+			   data-theme toggle — these overrides target the exact utility classes this
+			   page and dashboard-viewer.js actually use, repainting them for light mode.
+			   Plain (non-@layer) rules always beat Tailwind's @layer utilities in the
+			   cascade regardless of source order, but !important is added defensively
+			   since arbitrary-value utilities aren't guaranteed to follow that layering. */
+			[data-theme="light"] .text-gray-400,
+			[data-theme="light"] .text-gray-300,
+			[data-theme="light"] .text-gray-500 { color: var(--text-muted) !important; }
+			[data-theme="light"] .text-white { color: var(--text-main) !important; }
+			[data-theme="light"] .bg-\[\#0d1117\],
+			[data-theme="light"] .bg-\[\#21262d\] { background-color: var(--nav-underlay) !important; }
+			[data-theme="light"] .border-\[\#30363d\],
+			[data-theme="light"] .border-\[\#21262d\] { border-color: var(--border) !important; }
 		</style>
 	</head>
 	<body class="p-6 min-h-screen">
@@ -34,9 +80,12 @@
 						<button id="tab-btn-data" onclick="switchTab('data')" class="pb-2 cursor-pointer transition-colors hover:text-white">Applications Viewer</button>
 					</div>
 				</div>
-				<button onclick="fetchDashboardData()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2 px-4 rounded transition-all cursor-pointer shadow-md">
-					Refresh Data
-				</button>
+				<div class="flex items-center gap-3">
+					<button class="theme-toggle-btn" id="theme-toggle-btn"></button>
+					<button onclick="fetchDashboardData()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2 px-4 rounded transition-all cursor-pointer shadow-md">
+						Refresh Data
+					</button>
+				</div>
 			</div>
 
 			<div id="loading" class="text-center py-12">
@@ -320,7 +369,15 @@
 
 			window.addEventListener('DOMContentLoaded', () => {
 				document.getElementById('footer-year').textContent = new Date().getFullYear();
+				window.JobSuiteTheme.bindThemeToggleButton(document.getElementById('theme-toggle-btn'));
 				fetchDashboardData();
+			});
+
+			// Chart.js bakes its colors into the canvas at draw time, so a theme
+			// flip needs a real re-render — cheapest correct way is to just re-run
+			// the same render pass everything else already goes through.
+			document.addEventListener('jobsuite-theme-change', () => {
+				if (AppState.rawLengthData && AppState.rawLengthData.length) processAndRenderAll();
 			});
 		</script>
 

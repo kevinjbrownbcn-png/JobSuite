@@ -3,21 +3,29 @@ Audit, Staged Matches), calling jobsuite_gemini/jobsuite_api directly — no HTT
 same jobsuite.db the desktop app uses.
 """
 
+import re
+
 import streamlit as st
 
 import jobsuite_api
 import jobsuite_db
 import jobsuite_gemini as gemini
 from jobsuite_config import load_config
-from streamlit_common import load_json_config
+from streamlit_common import apply_theme, load_json_config
 
 st.set_page_config(page_title="Hunter — JobSuite", page_icon="🔎", layout="wide")
+apply_theme()
 
 jobsuite_db.init_db()
 config = load_config()
 profiles = load_json_config("hunter-profiles.json")
 POSTING_SOURCES = profiles.get("postingSources", [])
 PROFILE_VALUES = [p["value"] for p in profiles.get("profiles", [])]
+
+# Workday-hosted career sites virtually always run on this domain regardless of the
+# company's own branding — good enough as an auto-detect default, with the card's
+# checkbox left editable for the cases it misses (custom domains, etc).
+WORKDAY_URL_PATTERN = re.compile(r"myworkdayjobs\.com", re.IGNORECASE)
 
 st.title("🔎 AI Job Hunter")
 
@@ -240,6 +248,20 @@ with tab_staged:
                                 st.rerun()
                             else:
                                 st.error(body.get("error"))
+                        # Re-fires the same docgen webhook used by "Send to Prep" — always
+                        # retriable regardless of current status, so this just reuses it.
+                        # Creates a new set of docs alongside the existing ones, doesn't
+                        # overwrite them.
+                        if st.button("Regenerate Docs", key=f"regen_{mid}", help="Creates a new CV/cover letter — doesn't overwrite the existing ones."):
+                            with st.spinner("Re-pushing content to Docs…"):
+                                conn = jobsuite_db.get_connection()
+                                s, body = jobsuite_api.update_match(conn, mid, {"status": "New"}, config)
+                                conn.close()
+                            if s == 200:
+                                st.success(f"Moved to {body['status']}.")
+                                st.rerun()
+                            else:
+                                st.error(body.get("error"))
 
                     if status not in ("Migrated to Tracker", "Purged"):
                         label = "Retry Cleanup" if status == "Discarded" else "Discard"
@@ -256,14 +278,21 @@ with tab_staged:
                             else:
                                 st.error(body.get("error"))
 
-                with st.expander("Job Description"):
+                with st.expander("Job Description & Instructions"):
                     new_desc = st.text_area(
-                        "Description", value=match.get("job_description") or "",
-                        key=f"desc_{mid}", height=150, label_visibility="collapsed",
+                        "Job Description", value=match.get("job_description") or "",
+                        key=f"desc_{mid}", height=150,
                     )
-                    if st.button("Save Description", key=f"save_desc_{mid}"):
+                    new_notes = st.text_area(
+                        "Special Instructions (considered when generating docs)",
+                        value=match.get("notes") or "", key=f"notes_{mid}", height=80,
+                        placeholder='e.g. "Posting says on-site/hybrid — request remote consideration in the cover letter."',
+                    )
+                    if st.button("Save", key=f"save_desc_{mid}"):
                         conn = jobsuite_db.get_connection()
-                        s, body = jobsuite_api.update_match(conn, mid, {"job_description": new_desc}, config)
+                        s, body = jobsuite_api.update_match(
+                            conn, mid, {"job_description": new_desc, "notes": new_notes}, config,
+                        )
                         conn.close()
                         if s == 200:
                             st.success("Saved.")
@@ -298,6 +327,16 @@ else:
                     st.write(" ".join(f"`{g}`" for g in gaps))
                 if (job.get("link") or "").startswith("http"):
                     st.markdown(f"[Open Original Posting ↗]({job['link']})")
+
+                # Auto-detect once per job (mutating it in place) so re-running the
+                # script on every interaction doesn't clobber a manual override with a
+                # fresh auto-detect result.
+                if "is_workday" not in job:
+                    job["is_workday"] = bool(WORKDAY_URL_PATTERN.search(job.get("link") or job.get("job_url") or ""))
+                job["is_workday"] = st.checkbox(
+                    "Workday ATS", value=job["is_workday"], key=f"workday_{i}",
+                    help="Tailor the generated CV for Workday's ATS parser. Auto-detected from the job URL — override if it's wrong.",
+                )
             with c2:
                 if st.checkbox("Export", key=f"select_{i}", value=True):
                     to_export.append(job)

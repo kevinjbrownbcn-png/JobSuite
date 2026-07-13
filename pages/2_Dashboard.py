@@ -12,9 +12,10 @@ import streamlit as st
 import jobsuite_api
 import jobsuite_db
 from jobsuite_config import load_config
-from streamlit_common import categorize_role, load_json_config
+from streamlit_common import apply_theme, categorize_role, load_json_config
 
 st.set_page_config(page_title="Dashboard — JobSuite", page_icon="📊", layout="wide")
+apply_theme()
 
 jobsuite_db.init_db()
 config = load_config()

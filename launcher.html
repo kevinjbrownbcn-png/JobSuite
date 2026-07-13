@@ -2,17 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script src="js/theme.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JobSuite — Control Center</title>
     <style>
         :root {
-            --bg:          #0d1117;
-            --card-bg:     #161b22;
-            --border:      #30363d;
-            --text-main:   #c9d1d9;
-            --text-sub:    #8b949e;
-            --accent:      #2ea44f;
-            --accent-hover:#238636;
+            --bg:           #0f172a; /* Core App Background */
+            --card-bg:      #1e293b; /* Component Panels & Cards */
+            --nav-underlay: #0b0f19; /* Navigation / Header Underlay */
+            --border:       #30363d; /* Borders & Rule Lines */
+            --text-main:    #f8fafc; /* Main Typography */
+            --text-sub:     #64748b; /* Secondary / Muted Text */
+            --accent:       #2dd4bf; /* Primary Accent / Active Tab */
+            --accent-hover: #14b8a6;
+        }
+
+        :root[data-theme="light"] {
+            --bg:           #f8fafc;
+            --card-bg:      #ffffff;
+            --nav-underlay: #e2e8f0;
+            --border:       #cbd5e1;
+            --text-main:    #0f172a;
+            --text-sub:     #475569;
+            --accent:       #0d9488;
+            --accent-hover: #0f766e;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,7 +48,7 @@
         header h1 {
             font-size: 2.4rem;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--text-main);
             letter-spacing: 1px;
             margin-bottom: 8px;
         }
@@ -43,6 +56,25 @@
         header p {
             color: var(--text-sub);
             font-size: 1.05rem;
+        }
+
+        .theme-toggle-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-sub);
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .theme-toggle-btn:hover {
+            color: var(--text-main);
+            border-color: var(--accent);
         }
 
         .grid {
@@ -71,7 +103,7 @@
         .card:hover {
             transform: translateY(-6px);
             border-color: var(--accent);
-            box-shadow: 0 10px 28px rgba(46, 164, 79, 0.18);
+            box-shadow: 0 10px 28px rgba(13, 148, 136, 0.18);
         }
 
         .card-icon {
@@ -83,7 +115,7 @@
         .card h2 {
             font-size: 1.5rem;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--text-main);
         }
 
         .card p {
@@ -107,28 +139,30 @@
         .card:hover .btn { background-color: var(--accent-hover); }
 
         footer.app-footer {
-            background-color: #0f172a;
-            border-top: 1px solid #1e293b;
+            background-color: var(--nav-underlay);
+            border-top: 1px solid var(--border);
             padding: 12px 24px;
             text-align: right;
             font-size: 12px;
-            color: #64748b;
+            color: var(--text-sub);
             width: 100%;
             position: fixed;
             bottom: 0;
             left: 0;
         }
         footer.app-footer a {
-            color: #2dd4bf;
+            color: var(--accent);
             text-decoration: none;
             font-weight: 600;
             margin-left: 12px;
             transition: color 0.2s;
         }
-        footer.app-footer a:hover { color: #14b8a6; }
+        footer.app-footer a:hover { color: var(--accent-hover); }
     </style>
 </head>
 <body>
+
+    <button class="theme-toggle-btn" id="theme-toggle-btn"></button>
 
     <header>
         <h1>JobSuite</h1>
@@ -153,7 +187,10 @@
 
     </div>
 
-    <script>document.addEventListener('DOMContentLoaded', () => { document.getElementById('footer-year').textContent = new Date().getFullYear(); });</script>
+    <script>document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('footer-year').textContent = new Date().getFullYear();
+        window.JobSuiteTheme.bindThemeToggleButton(document.getElementById('theme-toggle-btn'));
+    });</script>
     <footer class="app-footer">
         <span>© <span id="footer-year"></span> JobSuite v1.0</span>
         <a href="./hunter.html">AI Job Hunter</a>
