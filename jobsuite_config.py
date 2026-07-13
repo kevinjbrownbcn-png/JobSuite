@@ -20,20 +20,20 @@ CONFIG_KEYS = (
 
 
 def exe_dir() -> str:
-    """Next to the running .exe (or this file's folder, in dev mode). Used only for
-    config.json, which is meant to genuinely differ per install (API keys/webhooks) —
-    everything else should use data_dir() instead so there's only ever one copy."""
+    """Next to the running .exe (or this file's folder, in dev mode). Used for things
+    that are genuinely meant to be per-install (logs/, export_history.json) — anything
+    that should be one shared copy (including config.json now) uses data_dir() instead."""
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 
 def data_dir() -> str:
-    """Where jobsuite.db / hunter-profiles.json / roles-config.json live — always the
-    project's source root, whether running from source or from a built exe sitting in
-    ./dist next to it, so there's never a second, diverging copy of real data or shared
-    config. Falls back to exe_dir() if the source root can't be found (e.g. the exe was
-    copied out on its own, with no source tree alongside it to point at)."""
+    """Where jobsuite.db / config.json / hunter-profiles.json / roles-config.json live —
+    always the project's source root, whether running from source or from a built exe
+    sitting in ./dist next to it, so there's never a second, diverging copy of real data
+    or shared config. Falls back to exe_dir() if the source root can't be found (e.g. the
+    exe was copied out on its own, with no source tree alongside it to point at)."""
     if getattr(sys, "frozen", False):
         exe_folder = os.path.dirname(sys.executable)
         parent = os.path.dirname(exe_folder)
@@ -44,7 +44,7 @@ def data_dir() -> str:
 
 
 def load_config() -> dict:
-    config_path = os.path.join(exe_dir(), "config.json")
+    config_path = os.path.join(data_dir(), "config.json")
     if not os.path.isfile(config_path):
         print(f"[INFO] No config.json found at {config_path} — using page defaults.")
         return {}

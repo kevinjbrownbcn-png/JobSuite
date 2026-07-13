@@ -7,7 +7,7 @@ Run with:
 
 Shares the exact same jobsuite.db and config.json as the desktop app (launch_launcher.py)
 as long as this file stays in the same folder as jobsuite_db.py / jobsuite_config.py —
-exe_dir() resolves to that folder in both cases.
+data_dir() resolves to that folder in both cases.
 """
 
 import streamlit as st
