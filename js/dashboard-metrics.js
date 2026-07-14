@@ -53,7 +53,7 @@ function renderCharts(statusCounts, channelCounts, roleCounts) {
             labels: Object.keys(roleCounts),
             datasets: [{
                 data: Object.values(roleCounts),
-                backgroundColor: ['#a855f7', '#ec4899', '#f43f5e', '#6366f1', '#06b6d4', '#4b5563'],
+                backgroundColor: ['#a855f7', '#ec4899', '#f43f5e', '#6366f1', '#06b6d4', '#4b5563', '#84cc16'],
                 borderWidth: 0
             }]
         },

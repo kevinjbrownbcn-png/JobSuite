@@ -16,6 +16,14 @@ CONFIG_KEYS = (
     #   discard_docs      (Discarded -> Purged)
     #   archive_declined  (applications status = Application Declined)
     "docgen_webhook", "drive_cleanup_webhook",
+    # JobPilot (Mode A: ATS Analyzer):
+    # anthropic_api_key -> Claude, deliberately separate from Gemini so the ATS
+    #                      re-score is an independent second opinion, not the same
+    #                      model re-scoring its own earlier match.
+    # doc_fetch_webhook -> a dedicated Make pipeline that fetches any Drive doc's
+    #                      text by ID (unlike gdrive_webhook, which is hardcoded to
+    #                      always fetch one fixed file — the base CV).
+    "anthropic_api_key", "doc_fetch_webhook",
 )
 
 

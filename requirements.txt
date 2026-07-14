@@ -1,6 +1,7 @@
 # Shared by both the desktop app and the Streamlit app
 requests
 beautifulsoup4
+anthropic
 
 # Streamlit app only
 streamlit

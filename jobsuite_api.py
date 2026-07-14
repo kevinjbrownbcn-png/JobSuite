@@ -11,6 +11,7 @@ import os
 import re
 from datetime import date, datetime, timezone
 
+import jobpilot_api
 import jobsuite_gemini as gemini
 import jobsuite_webhooks as webhooks
 from jobsuite_config import data_dir
@@ -373,6 +374,16 @@ def update_match(conn, match_id, body, config):
             set_clauses.append("status = ?")
             params.append("Processed")
 
+            # Captures the generated doc references for JobPilot's ATS Analyzer —
+            # degrades gracefully (leaves the columns null) if the response body
+            # doesn't include them, e.g. the Make scenario hasn't been re-imported
+            # with the updated WebhookRespond yet.
+            docgen_response = result.get("response") or {}
+            for field in ("cv_doc_id", "cv_doc_url", "cover_letter_doc_id", "cover_letter_doc_url"):
+                if docgen_response.get(field):
+                    set_clauses.append(f"{field} = ?")
+                    params.append(docgen_response[field])
+
         elif new_status == "Applied":
             # Pipeline 06 (isApplied route): finds the generated CV/cover letter and
             # moves them into the '_applied' Drive folder. Only once that succeeds does
@@ -634,6 +645,22 @@ def dispatch(method, path, query, body, config):
                 return create_application(conn, body)
             if method == "PATCH" and resource_id is not None:
                 return update_application(conn, resource_id, body, config)
+
+        elif resource == "prep-sessions":
+            if method == "GET" and action == "eligible":
+                return jobpilot_api.list_eligible_matches(conn)
+            if method == "POST" and resource_id is None:
+                match_id = body.get("match_id")
+                if not match_id:
+                    return _json_error("match_id is required.")
+                return jobpilot_api.create_prep_session(conn, match_id, config)
+            if method == "GET" and resource_id is not None:
+                return jobpilot_api.get_prep_session(conn, resource_id)
+            if method == "GET" and resource_id is None and action is None:
+                match_id_param = (query.get("match_id") or [None])[0]
+                if match_id_param:
+                    return jobpilot_api.list_prep_sessions(conn, int(match_id_param))
+                return _json_error("match_id query param is required.")
 
         return _json_error("Not found.", 404)
     finally:

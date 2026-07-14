@@ -1,6 +1,6 @@
 """JobSuite — Streamlit home page. Equivalent of launcher.html: a landing page
-pointing at the two functional pages (Hunter, Dashboard), which live in pages/ and
-show up automatically in Streamlit's sidebar navigation.
+pointing at the three functional pages (Hunter, Dashboard, JobPilot), which live in
+pages/ and show up automatically in Streamlit's sidebar navigation.
 
 Run with:
     streamlit run streamlit_app.py
@@ -25,7 +25,7 @@ config = load_config()
 st.title("💼 JobSuite — Control Center")
 st.caption("Automated Job Search & Tracking — Streamlit edition")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.subheader("🔎 AI Job Hunter")
     st.write(
@@ -42,12 +42,23 @@ with col2:
     )
     st.page_link("pages/2_Dashboard.py", label="Open Dashboard", icon="📊")
 
+with col3:
+    st.subheader("🧭 JobPilot")
+    st.write(
+        "Run a Claude-scored ATS fit analysis on each application's tailored CV against "
+        "its job description."
+    )
+    st.page_link("pages/3_JobPilot.py", label="Open JobPilot", icon="🧭")
+
 st.divider()
 
-missing = [k for k in ("gemini_api_key", "gdrive_webhook", "docgen_webhook", "drive_cleanup_webhook") if not config.get(k)]
-if missing:
-    st.warning(f"config.json is missing: {', '.join(missing)}. Some Hunter features won't work until these are set.")
-else:
+hunter_missing = [k for k in ("gemini_api_key", "gdrive_webhook", "docgen_webhook", "drive_cleanup_webhook") if not config.get(k)]
+jobpilot_missing = [k for k in ("anthropic_api_key", "doc_fetch_webhook") if not config.get(k)]
+if hunter_missing:
+    st.warning(f"config.json is missing: {', '.join(hunter_missing)}. Some Hunter features won't work until these are set.")
+if jobpilot_missing:
+    st.warning(f"config.json is missing: {', '.join(jobpilot_missing)}. JobPilot's ATS Analyzer won't work until these are set.")
+if not hunter_missing and not jobpilot_missing:
     st.success("config.json is fully configured.")
 
 st.caption(f"Database: `{jobsuite_db.DB_PATH}`")

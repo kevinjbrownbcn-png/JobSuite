@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="js/theme.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPilot — JobSuite</title>
+    <link rel="stylesheet" href="css/styles.css">
+
+    <script type="module">
+        import { renderEligibleMatches } from './js/jobpilot-ui.js';
+        window.renderEligibleMatches = renderEligibleMatches;
+
+        window.onload = async function() {
+            document.getElementById('footer-year').textContent = new Date().getFullYear();
+            window.JobSuiteTheme.bindThemeToggleButton(document.getElementById('theme-toggle-btn'));
+            await renderEligibleMatches();
+        };
+    </script>
+</head>
+<body>
+
+    <header>
+        <div class="header-branding">
+            <div class="header-icon">🧭</div>
+            <div class="header-text">
+                <h1>JobPilot</h1>
+                <p>ATS Analyzer — Claude-scored CV/JD fit</p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button onclick="window.renderEligibleMatches()" class="theme-toggle-btn">↻ Refresh</button>
+            <button class="theme-toggle-btn" id="theme-toggle-btn"></button>
+        </div>
+    </header>
+
+    <main>
+        <div class="card-panel" style="justify-content: flex-start; gap: 16px;">
+            <div>
+                <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Eligible Applications</h2>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">
+                    Matches with a tailored CV already generated (Staged Matches → Send to Prep). Run a Claude-scored
+                    ATS fit analysis against the same job description used to build that CV.
+                </p>
+            </div>
+
+            <div id="loading-state" class="hidden state-msg-box" style="padding: 32px;">
+                <div class="loader-spinner"></div>
+                <h3 id="loader-title">Running ATS analysis…</h3>
+                <p>Fetching the tailored CV and scoring it against the job description — this can take a little while.</p>
+            </div>
+
+            <div id="jobpilot-empty" class="state-msg-box hidden">
+                <div class="state-icon">🧭</div>
+                <h3>No eligible applications yet</h3>
+                <p>Once a Staged Match has a tailored CV generated (status "Processed"), it'll show up here.</p>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Role / Company</th>
+                            <th>Tailored CV</th>
+                            <th style="text-align:center;">Latest Score</th>
+                            <th style="text-align:right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobpilot-matches-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast-wrapper-container" class="toast-wrapper"></div>
+
+    <footer class="app-footer">
+        <span>© <span id="footer-year"></span> JobSuite | JobPilot</span>
+        <a href="./launcher.html">← Control Center</a>
+    </footer>
+
+</body>
+</html>

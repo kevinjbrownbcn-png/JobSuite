@@ -58,6 +58,33 @@ CREATE TABLE IF NOT EXISTS applications (
 
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_applications_source_match ON applications(source_match_id);
+
+-- JobPilot Mode A (ATS Analyzer): one row per Claude-scored fit analysis of a match's
+-- tailored CV against its job description. Kept separate from `applications` (which
+-- means something else — the real Tracker) to avoid the naming clash in the original
+-- JobPilot spec.
+CREATE TABLE IF NOT EXISTS prep_sessions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id            INTEGER NOT NULL REFERENCES matches(id),
+    resume_structured   TEXT,
+    job_structured      TEXT,
+    overall_score       INTEGER,
+    skills_match        INTEGER,
+    seniority_match     INTEGER,
+    domain_match        INTEGER,
+    experience_match    INTEGER,
+    format_risk         INTEGER,
+    matched_skills      TEXT,
+    missing_skills      TEXT,
+    missing_evidence    TEXT,
+    risks               TEXT,
+    recommendations     TEXT,
+    summary             TEXT,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_prep_sessions_match ON prep_sessions(match_id);
 """
 
 
@@ -76,6 +103,12 @@ MATCHES_MIGRATIONS = [
     ("applied_through", "TEXT"),
     ("posting_source", "TEXT"),
     ("is_workday", "INTEGER NOT NULL DEFAULT 0"),
+    # Populated from Pipeline 01's docgen webhook response once it returns them —
+    # lets JobPilot pull the actual tailored CV/cover letter text for ATS analysis.
+    ("cv_doc_id", "TEXT"),
+    ("cv_doc_url", "TEXT"),
+    ("cover_letter_doc_id", "TEXT"),
+    ("cover_letter_doc_url", "TEXT"),
 ]
 
 
