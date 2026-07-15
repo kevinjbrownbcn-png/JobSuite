@@ -54,12 +54,13 @@
         import { scanWebForJobs } from './js/hunter-scanner.js';
         import { exportJobsToTracker } from './js/hunter-exporter.js';
         import { analyzeCareersHub } from './js/hunter-hub.js';
-        import { renderStagedMatchesTable } from './js/hunter-staged.js';
+        import { renderStagedMatchesTable, filterAndRenderStagedMatches } from './js/hunter-staged.js';
 
         window.renderJobCards = renderJobCards;
         window.appendJobCards = appendJobCards;
         window.updateSelectedCounter = updateSelectedCounter;
         window.renderStagedMatchesTable = renderStagedMatchesTable;
+        window.filterAndRenderStagedMatches = filterAndRenderStagedMatches;
         window.analyzeCareersHub = analyzeCareersHub;
         window.addCustomRoleOption = addCustomRoleOption;
         window.toggleSelectAll = toggleSelectAll;
@@ -326,6 +327,18 @@
                     <button onclick="window.renderStagedMatchesTable()" class="btn-clear-history">Refresh</button>
                 </div>
 
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <select id="staged-filter-status" onchange="window.filterAndRenderStagedMatches()" class="text-input" style="width: auto; min-width: 170px;">
+                            <option value="ALL">All Statuses</option>
+                        </select>
+                        <select id="staged-filter-company" onchange="window.filterAndRenderStagedMatches()" class="text-input" style="width: auto; min-width: 170px;">
+                            <option value="ALL">All Companies</option>
+                        </select>
+                    </div>
+                    <span style="font-size: 11px; font-family: monospace; color: var(--text-muted);">Showing <span id="staged-matches-count" style="color: var(--accent); font-weight: 700;">0</span> records</span>
+                </div>
+
                 <div class="table-container">
                     <table>
                         <thead>
@@ -350,7 +363,9 @@
 	<footer class="app-footer">
         <span>© <span id="footer-year"></span> JobSuite | AI Job Hunter v4.0</span>
         <a href="./launcher.html">← Control Center</a>
-        <a href="#">System Integrity Log</a>
+        <a href="./dashboard.html">Pipeline Analytics</a>
+        <a href="./jobpilot.html">JobPilot</a>
+        <a href="./README.md" target="_blank">README</a>
 	</footer>
 </body>
 </html>

@@ -134,25 +134,69 @@ function toggleDescriptionEditor(match, rowEl) {
     rowEl.after(editorRow);
 }
 
+// Cached from the last fetch, so toggling a filter dropdown re-renders instantly
+// without another round-trip — same pattern dashboard-viewer.js uses.
+let cachedMatches = [];
+
+function populateStagedFilterOptions(matches) {
+    const statusSelect = document.getElementById('staged-filter-status');
+    const companySelect = document.getElementById('staged-filter-company');
+    if (!statusSelect || !companySelect) return;
+
+    const prevStatus = statusSelect.value || 'ALL';
+    const prevCompany = companySelect.value || 'ALL';
+
+    const statuses = [...new Set(matches.map(m => m.status).filter(Boolean))].sort();
+    const companies = [...new Set(matches.map(m => m.company).filter(Boolean))].sort();
+
+    statusSelect.innerHTML = '<option value="ALL">All Statuses</option>' +
+        statuses.map(s => `<option value="${escapeHTML(s)}">${escapeHTML((STATUS_LABELS[s] || { text: s }).text)}</option>`).join('');
+    companySelect.innerHTML = '<option value="ALL">All Companies</option>' +
+        companies.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+
+    // Restore the previous selection if it's still a valid option (the underlying
+    // data changed, e.g. after a status update), otherwise fall back to "ALL".
+    statusSelect.value = statuses.includes(prevStatus) || prevStatus === 'ALL' ? prevStatus : 'ALL';
+    companySelect.value = companies.includes(prevCompany) || prevCompany === 'ALL' ? prevCompany : 'ALL';
+}
+
 export async function renderStagedMatchesTable() {
     const tbody = document.getElementById('staged-matches-tbody');
-    const emptyState = document.getElementById('staged-matches-empty');
     if (!tbody) return;
 
-    let matches = [];
     try {
         const response = await fetch('/api/matches');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        matches = await response.json();
+        cachedMatches = await response.json();
     } catch (err) {
         console.error('Failed to load staged matches:', err);
         if (window.showAlert) window.showAlert('Load Failed', `Could not load staged matches: ${err.message}`, 'error');
         return;
     }
 
+    populateStagedFilterOptions(cachedMatches || []);
+    filterAndRenderStagedMatches();
+}
+
+export function filterAndRenderStagedMatches() {
+    const tbody = document.getElementById('staged-matches-tbody');
+    const emptyState = document.getElementById('staged-matches-empty');
+    if (!tbody) return;
+
+    const statusFilter = document.getElementById('staged-filter-status')?.value || 'ALL';
+    const companyFilter = document.getElementById('staged-filter-company')?.value || 'ALL';
+
+    const matches = (cachedMatches || []).filter(m =>
+        (statusFilter === 'ALL' || m.status === statusFilter) &&
+        (companyFilter === 'ALL' || m.company === companyFilter)
+    );
+
+    const countEl = document.getElementById('staged-matches-count');
+    if (countEl) countEl.textContent = matches.length;
+
     tbody.innerHTML = '';
 
-    if (!matches || matches.length === 0) {
+    if (!cachedMatches || cachedMatches.length === 0) {
         if (emptyState) emptyState.classList.remove('hidden');
         return;
     }

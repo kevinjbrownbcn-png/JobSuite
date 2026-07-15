@@ -52,6 +52,14 @@ function updateSortIcons() {
     }
 }
 
+function resetDataViewFilters() {
+    document.getElementById('table-search').value = '';
+    document.getElementById('filter-category').value = 'ALL';
+    document.getElementById('filter-status').value = 'ALL';
+    document.getElementById('filter-source').value = 'ALL';
+    filterAndRenderDataView();
+}
+
 function filterAndRenderDataView() {
     const searchQuery = document.getElementById('table-search').value.toLowerCase();
     const selectedCat = document.getElementById('filter-category').value;

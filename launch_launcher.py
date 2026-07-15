@@ -155,6 +155,7 @@ MIME_TYPES = {
     ".svg":  "image/svg+xml",
     ".ico":  "image/x-icon",
     ".json": "application/json",
+    ".md":   "text/plain; charset=utf-8",
 }
 
 
