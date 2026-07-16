@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <script src="js/theme.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JobPilot — JobSuite</title>
+    <title>Interview Assistant — JobSuite</title>
     <link rel="stylesheet" href="css/styles.css">
 
     <script type="module">
-        import { renderEligibleMatches } from './js/jobpilot-ui.js';
+        import { renderEligibleMatches } from './js/interview-ui.js';
         window.renderEligibleMatches = renderEligibleMatches;
 
         window.onload = async function() {
@@ -22,10 +22,10 @@
 
     <header>
         <div class="header-branding">
-            <div class="header-icon">🧭</div>
+            <div class="header-icon">🎤</div>
             <div class="header-text">
-                <h1>JobPilot</h1>
-                <p>ATS Analyzer — Claude-scored CV/JD fit</p>
+                <h1>Interview Assistant</h1>
+                <p>Practice with four stakeholder personas, scored turn by turn</p>
             </div>
         </div>
 
@@ -40,21 +40,16 @@
             <div>
                 <h2 style="margin: 0; font-size: 16px; font-weight: 700;">Eligible Applications</h2>
                 <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">
-                    Matches with a tailored CV already generated (Staged Matches → Send to Prep). Run a Claude-scored
-                    ATS fit analysis against the same job description used to build that CV.
+                    Any match with a job description can be practiced against. Sessions reuse JobPilot's ATS
+                    analysis when it exists; otherwise the job description (and tailored CV, if one was
+                    generated) is parsed on the spot. Pick a persona to start or resume a session.
                 </p>
             </div>
 
-            <div id="loading-state" class="hidden state-msg-box" style="padding: 32px;">
-                <div class="loader-spinner"></div>
-                <h3 id="loader-title">Running ATS analysis…</h3>
-                <p>Fetching the tailored CV and scoring it against the job description — this can take a little while.</p>
-            </div>
-
-            <div id="jobpilot-empty" class="state-msg-box hidden">
-                <div class="state-icon">🧭</div>
+            <div id="interview-empty" class="state-msg-box hidden">
+                <div class="state-icon">🎤</div>
                 <h3>No eligible applications yet</h3>
-                <p>Once a Staged Match has a tailored CV generated (status "Processed"), it'll show up here.</p>
+                <p>Once Hunter has a match with a job description, it'll show up here.</p>
             </div>
 
             <div class="table-container">
@@ -62,12 +57,11 @@
                     <thead>
                         <tr>
                             <th>Role / Company</th>
-                            <th>Tailored CV</th>
-                            <th style="text-align:center;">Latest Score</th>
-                            <th style="text-align:right;">Action</th>
+                            <th>Data available</th>
+                            <th>Personas</th>
                         </tr>
                     </thead>
-                    <tbody id="jobpilot-matches-tbody"></tbody>
+                    <tbody id="interview-matches-tbody"></tbody>
                 </table>
             </div>
         </div>
@@ -76,11 +70,11 @@
     <div id="toast-wrapper-container" class="toast-wrapper"></div>
 
     <footer class="app-footer">
-        <span>© <span id="footer-year"></span> JobSuite | JobPilot</span>
+        <span>© <span id="footer-year"></span> JobSuite | Interview Assistant</span>
         <a href="./launcher.html">← Control Center</a>
         <a href="./hunter.html">AI Job Hunter</a>
         <a href="./dashboard.html">Pipeline Analytics</a>
-        <a href="./interview.html">Interview Assistant</a>
+        <a href="./jobpilot.html">JobPilot</a>
         <a href="./README.md" target="_blank">README</a>
     </footer>
 

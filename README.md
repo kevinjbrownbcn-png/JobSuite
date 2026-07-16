@@ -24,6 +24,15 @@ Pipeline 01 generated for a specific application against that application's actu
 description. Produces a weighted fit score (Skills/Seniority/Domain/Experience/Format
 Risk), matched/missing skills, and concrete recommendations.
 
+### 🎤 Interview Assistant (`interview.html`)
+Mock-interview practice against four stakeholder personas (Recruiter/HR, Hiring
+Manager, Department Manager, Peer), each asking grounded, CV/JD-aware questions and
+scoring your answers turn by turn on a fixed rubric (relevance, specificity, role
+alignment, clarity, completeness). Reuses JobPilot's parsed CV/JD data when it
+exists; otherwise parses the job description (and tailored CV, if any) on the spot,
+so postings that predate a JobPilot run are still practiceable. Personas run
+independently and are re-runnable.
+
 ## Running it
 
 **Desktop**: run the built `.exe` in `dist/` (build with `build_exe.py`).
@@ -41,7 +50,7 @@ just the same files.
 Copy your real values into `config.json` (never committed — see `.gitignore`):
 
 - `gemini_api_key` — Hunter's match scoring/scanning
-- `anthropic_api_key` — JobPilot's ATS analysis
+- `anthropic_api_key` — JobPilot's ATS analysis and Interview Assistant's persona chats
 - `gdrive_webhook`, `docgen_webhook`, `drive_cleanup_webhook`, `doc_fetch_webhook`,
   `export_webhook` — Make.com pipeline URLs (see `jobsuite_webhooks.py` and
   `jobsuite_claude.py` for what each one does)

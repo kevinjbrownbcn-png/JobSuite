@@ -1,6 +1,7 @@
 """JobSuite — Streamlit home page. Equivalent of launcher.html: a landing page
-pointing at the three functional pages (Hunter, Dashboard, JobPilot), which live in
-pages/ and show up automatically in Streamlit's sidebar navigation.
+pointing at the four functional pages (Hunter, Dashboard, JobPilot, Interview
+Assistant), which live in pages/ and show up automatically in Streamlit's sidebar
+navigation.
 
 Run with:
     streamlit run streamlit_app.py
@@ -25,7 +26,7 @@ config = load_config()
 st.title("💼 JobSuite — Control Center")
 st.caption("Automated Job Search & Tracking — Streamlit edition")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.subheader("🔎 AI Job Hunter")
     st.write(
@@ -49,6 +50,14 @@ with col3:
         "its job description."
     )
     st.page_link("pages/3_JobPilot.py", label="Open JobPilot", icon="🧭")
+
+with col4:
+    st.subheader("🎤 Interview Assistant")
+    st.write(
+        "Practice mock interviews with four stakeholder personas, each scoring "
+        "your answers turn by turn."
+    )
+    st.page_link("pages/4_Interview.py", label="Open Interview Assistant", icon="🎤")
 
 st.divider()
 

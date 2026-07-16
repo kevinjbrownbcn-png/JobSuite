@@ -85,6 +85,46 @@ CREATE TABLE IF NOT EXISTS prep_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_prep_sessions_match ON prep_sessions(match_id);
+
+-- JobPilot Mode B (Interview Assistant): one row per persona practice run against
+-- a match. Kept separate from prep_sessions since a match can have many interview
+-- runs (one per persona, re-runnable) but only ever gets ATS-scored occasionally.
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id            INTEGER NOT NULL REFERENCES matches(id),
+    persona             TEXT NOT NULL
+                        CHECK(persona IN ('recruiter','hiring_manager',
+                                          'department_manager','peer')),
+    status              TEXT NOT NULL DEFAULT 'in_progress'
+                        CHECK(status IN ('in_progress','completed')),
+    resume_structured   TEXT,
+    job_structured      TEXT,
+    goal                TEXT,
+    tone                TEXT,
+    rubric              TEXT,
+    overall_score       INTEGER,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_interview_sessions_match ON interview_sessions(match_id);
+
+-- One row per question/answer turn within an interview_sessions run.
+CREATE TABLE IF NOT EXISTS interview_turns (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id          INTEGER NOT NULL REFERENCES interview_sessions(id),
+    turn_index          INTEGER NOT NULL,
+    question            TEXT NOT NULL,
+    answer              TEXT,
+    answer_score        INTEGER,
+    criterion_scores    TEXT,
+    feedback            TEXT,
+    strengths           TEXT,
+    gaps                TEXT,
+    created_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_interview_turns_session ON interview_turns(session_id);
 """
 
 

@@ -11,6 +11,7 @@ import os
 import re
 from datetime import date, datetime, timezone
 
+import interview_api
 import jobpilot_api
 import jobsuite_gemini as gemini
 import jobsuite_webhooks as webhooks
@@ -623,6 +624,7 @@ def dispatch(method, path, query, body, config):
         return _json_error("Not found.", 404)
 
     resource_id = int(action) if action and action.isdigit() else None
+    sub_action = parts[3] if len(parts) > 3 else None  # e.g. ['api','interview-sessions','5','turn']
 
     conn = get_connection()
     try:
@@ -660,6 +662,28 @@ def dispatch(method, path, query, body, config):
                 match_id_param = (query.get("match_id") or [None])[0]
                 if match_id_param:
                     return jobpilot_api.list_prep_sessions(conn, int(match_id_param))
+                return _json_error("match_id query param is required.")
+
+        elif resource == "interview-sessions":
+            if method == "GET" and action == "eligible":
+                return interview_api.list_eligible_matches(conn)
+            if method == "POST" and resource_id is None:
+                match_id = body.get("match_id")
+                persona = body.get("persona")
+                if not match_id or not persona:
+                    return _json_error("match_id and persona are required.")
+                return interview_api.start_session(conn, match_id, persona, config)
+            if method == "POST" and resource_id is not None and sub_action == "turn":
+                answer = body.get("answer")
+                if not answer:
+                    return _json_error("answer is required.")
+                return interview_api.submit_turn(conn, resource_id, answer, config)
+            if method == "GET" and resource_id is not None:
+                return interview_api.get_session(conn, resource_id)
+            if method == "GET" and resource_id is None and action is None:
+                match_id_param = (query.get("match_id") or [None])[0]
+                if match_id_param:
+                    return interview_api.list_sessions(conn, int(match_id_param))
                 return _json_error("match_id query param is required.")
 
         return _json_error("Not found.", 404)

@@ -260,3 +260,138 @@ def run_ats_analysis(resume_text: str, jd_text: str, api_key: str) -> dict:
         "job_structured": job_structured,
         "score": score,
     }
+
+
+# ---------------------------------------------------------------------------
+# JobPilot Mode B (Interview Assistant) — exact prompt text from
+# _prompts/interview_session_starter_prompt.md and _prompts/interview_turn_prompt.md.
+# ---------------------------------------------------------------------------
+
+PERSONA_LABELS = {
+    "recruiter": "Recruiter / HR",
+    "hiring_manager": "Hiring Manager",
+    "department_manager": "Department Manager",
+    "peer": "Peer Interviewer",
+}
+
+INTERVIEW_STARTER_SYSTEM_PROMPT = """You are the Interview Session Manager.
+
+Task:
+Start a structured interview session for the selected persona.
+
+Rules:
+- Return JSON only.
+- Use the candidate resume and job description as the basis.
+- Set the tone and question style appropriate to the persona.
+- Ask the first question only.
+- Keep the first question grounded in the role and the candidate's background.
+
+Output schema:
+{
+  "persona": "recruiter|hiring_manager|department_manager|peer",
+  "goal": "string",
+  "tone": "string",
+  "firstQuestion": "string",
+  "rubric": ["string"],
+  "expectedSignals": ["string"]
+}"""
+
+INTERVIEW_TURN_SYSTEM_PROMPT = """You are the {persona} interviewer.
+
+Task:
+Evaluate the candidate's answer, then decide whether to ask a follow-up question or move on.
+
+Rules:
+- Return JSON only.
+- Ask one question at a time.
+- Base every question on the candidate CV, the job description, and prior answers.
+- Do not repeat previously asked questions.
+- Keep the tone realistic for the persona.
+- Score the answer using the rubric.
+- Score each rubric criterion on a scale of 1 (weak) to 5 (excellent). Never use any other range.
+- If the answer is weak or incomplete, ask a focused follow-up.
+- If the answer is sufficient, move to the next area.
+
+Rubric:
+- Relevance.
+- Specificity.
+- Role alignment.
+- Communication clarity.
+- Confidence and completeness.
+
+Output schema:
+{
+  "persona": "recruiter|hiring_manager|department_manager|peer",
+  "question": "string|null",
+  "answerScore": 0,
+  "criterionScores": {
+    "relevance": 0,
+    "specificity": 0,
+    "roleAlignment": 0,
+    "clarity": 0,
+    "completeness": 0
+  },
+  "feedback": ["string"],
+  "strengths": ["string"],
+  "gaps": ["string"],
+  "nextAction": "follow_up|next_persona|end_session",
+  "followUpQuestion": "string|null"
+}
+
+Every value inside criterionScores must be an integer from 1 to 5."""
+
+
+def _compute_answer_score(criterion_scores: dict) -> int:
+    """Equal-weight average of the 5 rubric criteria (1-5 scale each per the master
+    spec), normalized to 0-100 for consistency with the ATS scores. Claude's own
+    `answerScore` field is discarded, same reasoning as _compute_overall_score above —
+    a fixed formula is auditable and consistent run-to-run.
+
+    Each raw value is clamped to [1, 5] before normalizing — the prompt instructs a
+    1-5 scale, but an LLM can still ignore that (observed in testing: Claude returned
+    7s and 8s once), and an out-of-range value must never push the final score past
+    the 0-100 the rest of the app assumes."""
+    values = [v for v in criterion_scores.values() if v is not None]
+    if not values:
+        return 0
+    clamped = [max(1, min(5, v)) for v in values]
+    normalized = [(v / 5) * 100 for v in clamped]
+    return round(sum(normalized) / len(normalized))
+
+
+def start_interview(persona: str, resume_structured: dict | None, job_structured: dict, api_key: str) -> dict:
+    user_content = (
+        f"Persona: {persona}\n\n"
+        f"Structured resume:\n{json.dumps(resume_structured) if resume_structured else 'null (no resume data available — ask role/JD-focused questions only)'}\n\n"
+        f"Structured job description:\n{json.dumps(job_structured)}"
+    )
+    return _call_claude(api_key, INTERVIEW_STARTER_SYSTEM_PROMPT, user_content)
+
+
+def interview_turn(
+    persona: str,
+    resume_structured: dict | None,
+    job_structured: dict,
+    history: list,
+    answer: str,
+    api_key: str,
+) -> dict:
+    """`history` is a list of {"question": str, "answer": str|None} dicts for every
+    prior turn in this session, oldest first. `answer` is the candidate's response to
+    the most recent question in that history."""
+    # .replace(), not .format() — the prompt's JSON schema block is full of literal
+    # {braces} that .format() would try (and fail) to parse as format fields.
+    system_prompt = INTERVIEW_TURN_SYSTEM_PROMPT.replace("{persona}", PERSONA_LABELS.get(persona, persona))
+    history_text = "\n".join(
+        f"Q{i + 1}: {h['question']}\nA{i + 1}: {h.get('answer') or '(no answer yet)'}"
+        for i, h in enumerate(history)
+    ) or "(none yet)"
+    user_content = (
+        f"Structured resume:\n{json.dumps(resume_structured) if resume_structured else 'null (no resume data available)'}\n\n"
+        f"Structured job description:\n{json.dumps(job_structured)}\n\n"
+        f"Conversation so far:\n{history_text}\n\n"
+        f"Candidate's latest answer:\n{answer}"
+    )
+    result = _call_claude(api_key, system_prompt, user_content)
+    result["answerScore"] = _compute_answer_score(result.get("criterionScores") or {})
+    return result
