@@ -60,8 +60,9 @@ def fire_docgen(webhook_url, match_row):
 
     `notes` carries user-written instructions for this specific application (e.g.
     "posting says on-site/hybrid — request remote consideration in the cover letter")
-    for the scenario's drafting step to take into account. It's inert until Pipeline
-    01's own prompt is updated to read and act on it — this just gets it there.
+    that Pipeline 01's drafting prompt reads and applies to tone/emphasis/framing —
+    confirmed live end-to-end (2026-07-21): a relocation + mission-alignment note
+    came through verbatim in the generated cover letter.
     """
     payload = {
         "profile": match_row.get("profile"),

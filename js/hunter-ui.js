@@ -24,6 +24,19 @@ function scoreToColor(score) {
 // checkbox left editable for the cases it misses (custom domains, etc).
 const WORKDAY_URL_PATTERN = /myworkdayjobs\.com/i;
 
+// Card-level edits (notes, the Workday checkbox) mutate window.currentJobsList in
+// place, but bulk export reads each card's `dataset.jobData` — a JSON snapshot frozen
+// at render time — not the live array. Without re-syncing it here, a typed note or a
+// toggled checkbox would silently vanish on bulk "Export Selected" (single-card
+// export/discard is unaffected since those read window.currentJobsList directly).
+window.syncCardDataset = function(index) {
+    const checkbox = document.querySelector(`.job-card-checkbox[data-index="${index}"]`);
+    const card = checkbox ? checkbox.closest('.job-card') : null;
+    if (card && window.currentJobsList && window.currentJobsList[index]) {
+        card.dataset.jobData = JSON.stringify(window.currentJobsList[index]);
+    }
+};
+
 export function updateSelectedCounter() {
     const totalCards = document.querySelectorAll('.job-card').length;
     const checkedCards = document.querySelectorAll('.job-card-checkbox:checked').length;
@@ -217,6 +230,16 @@ export function renderJobCards(jobs) {
                     <div style="display: flex; flex-wrap: wrap; gap: 6px;">${skillGapsHTML}</div>
                 </div>
 
+                <div class="gap-section">
+                    <div class="gap-title">Special Instructions (optional — considered when generating docs)</div>
+                    <textarea
+                        class="job-card-notes"
+                        placeholder='e.g. "Posting says on-site/hybrid — request remote consideration in the cover letter."'
+                        oninput="window.currentJobsList[${index}].notes = this.value; window.syncCardDataset(${index});"
+                        style="width:100%; min-height:44px; background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:12px; font-family:inherit; box-sizing:border-box; resize:vertical; margin-top:4px;"
+                    >${escapeHTML(job.notes) || ''}</textarea>
+                </div>
+
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         ${safeLink
@@ -228,7 +251,7 @@ export function renderJobCards(jobs) {
                                 type="checkbox"
                                 class="workday-ats-checkbox"
                                 ${job.is_workday ? 'checked' : ''}
-                                onchange="window.currentJobsList[${index}].is_workday = this.checked;"
+                                onchange="window.currentJobsList[${index}].is_workday = this.checked; window.syncCardDataset(${index});"
                             >
                             Workday ATS
                         </label>
